@@ -107,9 +107,52 @@
                 <span>Remember Me</span>
               </label>
               <button type="submit" class="primary-btn large login-submit"><span>→</span><b>SIGN IN</b></button>
-              <button type="button" id="forgotPasscode" class="text-link">Forgot Passcode</button>
-              <p class="auth-note">Prototype authentication only. Credentials are loaded from local environment variables and are never displayed in the interface.</p>
+              <div class="auth-links">
+                <button type="button" id="createAccount" class="text-link">Create an account</button>
+                <button type="button" id="forgotPasscode" class="text-link">Forgot Passcode</button>
+              </div>
+              <p class="auth-note">Prototype authentication only. Accounts are stored only in this browser and are not shared with other devices.</p>
             </form>
+            <section class="signup-panel hidden" id="signupPanel" aria-live="polite">
+              <div class="recovery-head">
+                <span class="dot"></span>
+                <div><strong>Create your account</strong><small>LOCAL PROTOTYPE ACCOUNT</small></div>
+                <button type="button" class="text-link" id="closeSignup">Close</button>
+              </div>
+              <p>Create an email and a password to use this dashboard in this browser.</p>
+              <label><span>Email</span><input id="signupEmail" type="email" autocomplete="email" placeholder="Enter your email address" /></label>
+              <label><span>Create Password</span><input id="signupPasscode" type="password" autocomplete="new-password" placeholder="At least 8 characters" /></label>
+              <label><span>Confirm Password</span><input id="signupConfirmPasscode" type="password" autocomplete="new-password" placeholder="Re-enter your password" /></label>
+              <button type="button" class="primary-btn" id="completeSignup">CREATE ACCOUNT</button>
+              <p class="recovery-message" id="signupMessage"></p>
+              <p class="auth-note">For a real public app, accounts must be stored and protected by a secure backend—not in browser storage.</p>
+            </section>
+            <section class="recovery-panel hidden" id="recoveryPanel" aria-live="polite">
+              <div class="recovery-head">
+                <span class="dot"></span>
+                <div><strong>Passcode Recovery</strong><small>PROTOTYPE SESSION RECOVERY</small></div>
+                <button type="button" class="text-link" id="closeRecovery">Close</button>
+              </div>
+              <p>Confirm the configured authority email to set a new passcode for this browser session.</p>
+              <label>
+                <span>Authority Email</span>
+                <input id="recoveryEmail" type="email" autocomplete="email" placeholder="Enter your authority email" />
+              </label>
+              <button type="button" class="secondary-btn" id="verifyRecoveryEmail">VERIFY EMAIL</button>
+              <div class="recovery-reset hidden" id="recoveryReset">
+                <label>
+                  <span>New Passcode</span>
+                  <input id="recoveryNewPasscode" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" />
+                </label>
+                <label>
+                  <span>Confirm New Passcode</span>
+                  <input id="recoveryConfirmPasscode" type="password" autocomplete="new-password" placeholder="Confirm your new passcode" />
+                </label>
+                <button type="button" class="primary-btn" id="completeRecovery">SET SESSION PASSCODE</button>
+              </div>
+              <p class="recovery-message" id="recoveryMessage"></p>
+              <p class="auth-note">No email is sent and no real account is changed. Production passcode recovery requires a secure backend and email provider.</p>
+            </section>
           </div>
         </div>
       </div>

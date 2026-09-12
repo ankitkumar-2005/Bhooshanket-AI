@@ -3,6 +3,12 @@ import { mountBhooShanketLogo, setupBhooShanketFavicon } from './logo.js';
 const AUTH_KEY = 'bhooshanket_session';
 const THEME_KEY = 'bhooshanket_theme';
 const ASSISTANT_STATE_KEY = 'bhooshanket_assistant_state';
+const RECOVERY_PASSCODE_KEY = 'bhooshanket_recovery_passcode';
+const LOCAL_ACCOUNTS_KEY = 'bhooshanket_local_accounts';
+const OFFLINE_DEMO_AUTH = {
+  email: 'demo@bhooshanket.ai',
+  passcode: 'BhooShanketDemo2026!'
+};
 const VIEWS = ['dashboard', 'map', 'prediction', 'analytics', 'weather', 'sensors', 'alerts', 'communication', 'authority', 'rescue', 'citizen', 'route', 'zones', 'precautions', 'contacts', 'energy', 'settings'];
 const ENERGY_MODES = ['ACTIVE MONITORING', 'ENERGY SAVING', 'NIGHT MONITORING', 'AUTOMATIC ALERT PRIORITY'];
 const INCIDENT_FLOW = ['NEW', 'ACKNOWLEDGED', 'TEAM ASSIGNED', 'DISPATCHED', 'ON SCENE', 'RESOLVED'];
@@ -206,10 +212,38 @@ function getSelectedLocation() {
 
 function getAuthConfig() {
   const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+  const email = String(env.VITE_BHOOSHANKET_LOGIN_EMAIL || '').trim().toLowerCase();
+  const passcode = String(env.VITE_BHOOSHANKET_LOGIN_PASSCODE || '');
   return {
-    email: String(env.VITE_BHOOSHANKET_LOGIN_EMAIL || '').trim().toLowerCase(),
-    passcode: String(env.VITE_BHOOSHANKET_LOGIN_PASSCODE || '')
+    // The fallback keeps the downloaded/static prototype usable when it is
+    // opened directly from disk instead of through Vite.
+    email: email || OFFLINE_DEMO_AUTH.email,
+    passcode: sessionStorage.getItem(RECOVERY_PASSCODE_KEY) || passcode || OFFLINE_DEMO_AUTH.passcode
   };
+}
+
+function getLocalAccounts() {
+  try {
+    const accounts = JSON.parse(localStorage.getItem(LOCAL_ACCOUNTS_KEY) || '{}');
+    return accounts && typeof accounts === 'object' ? accounts : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalAccounts(accounts) {
+  localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+function hasLocalAccount(email) {
+  return Object.prototype.hasOwnProperty.call(getLocalAccounts(), email);
+}
+
+function isValidLogin(email, passcode) {
+  const config = getAuthConfig();
+  const accounts = getLocalAccounts();
+  return (Boolean(config.email && config.passcode) && email === config.email && passcode === config.passcode)
+    || (typeof accounts[email] === 'string' && passcode === accounts[email]);
 }
 
 function hasAuthSession() {
@@ -2152,14 +2186,11 @@ function initializeEvents() {
 
   document.getElementById('loginForm').addEventListener('submit', (event) => {
     event.preventDefault();
-    const config = getAuthConfig();
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const passcode = document.getElementById('passwordInput').value;
-    // This is intentionally prototype-only client-side auth. A missing local
-    // configuration must never become an open sign-in path.
-    const configured = Boolean(config.email && config.passcode);
-    const valid = configured && email === config.email && passcode === config.passcode;
-    document.getElementById('loginError').classList.toggle('hidden', valid);
+    const valid = isValidLogin(email, passcode);
+    const error = document.getElementById('loginError');
+    error.classList.toggle('hidden', valid);
     if (valid) {
       const status = document.getElementById('authStatus');
       const submit = document.querySelector('.login-submit');
@@ -2170,7 +2201,7 @@ function initializeEvents() {
     } else {
       const status = document.getElementById('authStatus');
       if (status) status.classList.add('hidden');
-      document.getElementById('loginError').textContent = 'Invalid email or passcode.';
+      error.textContent = 'Invalid email or password. Create an account if you are new here.';
     }
   });
 
@@ -2183,8 +2214,105 @@ function initializeEvents() {
     btn.setAttribute('aria-label', isPassword ? 'Hide passcode' : 'Show passcode');
   });
 
+  const signupPanel = document.getElementById('signupPanel');
+  const signupMessage = document.getElementById('signupMessage');
+  const setSignupMessage = (message, tone = '') => {
+    if (!signupMessage) return;
+    signupMessage.textContent = message;
+    signupMessage.className = `recovery-message ${tone}`.trim();
+  };
+  const closeSignup = () => {
+    signupPanel?.classList.add('hidden');
+    ['signupEmail', 'signupPasscode', 'signupConfirmPasscode'].forEach(id => { document.getElementById(id).value = ''; });
+    setSignupMessage('');
+  };
+  document.getElementById('createAccount')?.addEventListener('click', () => {
+    recoveryPanel?.classList.add('hidden');
+    signupPanel?.classList.remove('hidden');
+    document.getElementById('signupEmail')?.focus();
+    signupPanel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  document.getElementById('closeSignup')?.addEventListener('click', closeSignup);
+  document.getElementById('completeSignup')?.addEventListener('click', () => {
+    const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+    const passcode = document.getElementById('signupPasscode').value;
+    const confirmation = document.getElementById('signupConfirmPasscode').value;
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setSignupMessage('Enter a valid email address.', 'error');
+    if (passcode.length < 8) return setSignupMessage('Use at least 8 characters for the password.', 'error');
+    if (passcode !== confirmation) return setSignupMessage('The passwords do not match.', 'error');
+    if (hasLocalAccount(email) || email === getAuthConfig().email) return setSignupMessage('An account already exists for this email. Please sign in.', 'error');
+    const accounts = getLocalAccounts();
+    accounts[email] = passcode;
+    saveLocalAccounts(accounts);
+    document.getElementById('loginEmail').value = email;
+    document.getElementById('passwordInput').value = '';
+    closeSignup();
+    showToast('Account created. Sign in with your new password.', 'success');
+  });
+
+  const recoveryPanel = document.getElementById('recoveryPanel');
+  const recoveryReset = document.getElementById('recoveryReset');
+  const recoveryMessage = document.getElementById('recoveryMessage');
+  const setRecoveryMessage = (message, tone = '') => {
+    if (!recoveryMessage) return;
+    recoveryMessage.textContent = message;
+    recoveryMessage.className = `recovery-message ${tone}`.trim();
+  };
+  const closeRecovery = () => {
+    recoveryPanel?.classList.add('hidden');
+    recoveryReset?.classList.add('hidden');
+    document.getElementById('recoveryEmail').value = '';
+    document.getElementById('recoveryNewPasscode').value = '';
+    document.getElementById('recoveryConfirmPasscode').value = '';
+    setRecoveryMessage('');
+  };
+
   document.getElementById('forgotPasscode')?.addEventListener('click', () => {
-    showToast('Passcode recovery is disabled in prototype mode.', 'info');
+    signupPanel?.classList.add('hidden');
+    recoveryPanel?.classList.remove('hidden');
+    recoveryReset?.classList.add('hidden');
+    setRecoveryMessage('Verify your configured authority email to continue.');
+    document.getElementById('recoveryEmail')?.focus();
+    recoveryPanel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  document.getElementById('closeRecovery')?.addEventListener('click', closeRecovery);
+  document.getElementById('verifyRecoveryEmail')?.addEventListener('click', () => {
+    const config = getAuthConfig();
+    const requestedEmail = document.getElementById('recoveryEmail').value.trim().toLowerCase();
+    if (requestedEmail !== config.email && !hasLocalAccount(requestedEmail)) {
+      setRecoveryMessage('The authority email could not be verified.', 'error');
+      return;
+    }
+    recoveryReset?.classList.remove('hidden');
+    setRecoveryMessage('Email verified. Choose a new passcode for this browser session.', 'success');
+    document.getElementById('recoveryNewPasscode')?.focus();
+  });
+
+  document.getElementById('completeRecovery')?.addEventListener('click', () => {
+    const newPasscode = document.getElementById('recoveryNewPasscode').value;
+    const confirmation = document.getElementById('recoveryConfirmPasscode').value;
+    if (newPasscode.length < 8) {
+      setRecoveryMessage('Use at least 8 characters for the new passcode.', 'error');
+      return;
+    }
+    if (newPasscode !== confirmation) {
+      setRecoveryMessage('The two passcodes do not match.', 'error');
+      return;
+    }
+    const recoveryEmail = document.getElementById('recoveryEmail').value.trim().toLowerCase();
+    if (hasLocalAccount(recoveryEmail)) {
+      const accounts = getLocalAccounts();
+      accounts[recoveryEmail] = newPasscode;
+      saveLocalAccounts(accounts);
+    } else {
+      sessionStorage.setItem(RECOVERY_PASSCODE_KEY, newPasscode);
+    }
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('loginEmail').value = recoveryEmail;
+    setRecoveryMessage('Session passcode updated. Use it to sign in now.', 'success');
+    recoveryReset?.classList.add('hidden');
+    showToast('Prototype session passcode updated', 'success');
   });
 
   const updateLocationFromSelectors = (state, district, zone) => {
