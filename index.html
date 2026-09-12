@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BhooShanket AI — Disaster Intelligence & Emergency Response</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 3 L43 12 V34 L24 45 L5 34 V12 Z' fill='%23060e1b' stroke='%2342c4ff' stroke-width='2'/%3E%3Cpath d='M9 34 L19 19 L26 27 L33 16 L39 26' stroke='%2342c4ff' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='33' cy='16' r='4' fill='%23ff4d5f'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <div class="boot-overlay hidden" id="bootOverlay" role="dialog" aria-modal="true" aria-label="System Initializing">
+      <div class="boot-panel">
+        <div class="boot-logo-mount" id="bootLogoMount"></div>
+        <div class="boot-kicker">SYSTEM INITIALIZING</div>
+        <h1>COMMAND NETWORK</h1>
+        <p id="bootStatus">SYNCHRONIZING GEOSPATIAL TELEMETRY...</p>
+        <ul class="boot-systems" id="bootSystems">
+          <li>ENVIRONMENTAL SENSORS ONLINE</li>
+          <li>AI RISK ENGINE ONLINE</li>
+          <li>GEOSPATIAL INTELLIGENCE ONLINE</li>
+          <li>EMERGENCY NETWORK READY</li>
+          <li>RESPONSE COORDINATION READY</li>
+        </ul>
+        <button type="button" class="primary-btn compact" id="skipBootBtn">ENTER COMMAND CENTER →</button>
+      </div>
+    </div>
+
+    <div class="cinematic-overlay hidden" id="cinematicOverlay" role="status" aria-live="polite">
+      <div class="cinematic-card" id="cinematicCard"></div>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <div class="drawer-overlay hidden" id="drawerOverlay"></div>
+    <aside class="detail-drawer hidden" id="detailDrawer"></aside>
+
+    <div class="page-shell">
+      <div class="scan-grid" aria-hidden="true"></div>
+      <div class="login-screen" id="loginScreen">
+        <div class="terrain-bg"></div>
+        <div class="noise"></div>
+        <div class="login-visuals" aria-hidden="true">
+          <div class="terrain-ridge terrain-ridge-back"></div>
+          <div class="terrain-ridge terrain-ridge-front"></div>
+          <div class="login-orbit orbit-one"></div>
+          <div class="login-orbit orbit-two"></div>
+          <div class="login-radar-target"><span></span><b>ALERT</b><strong>GANGTOK / ZONE 04</strong></div>
+          <div class="login-satellite"><i></i><span></span><b></b></div>
+          <div class="satellite-beam"></div>
+          <div class="login-drone"><i></i><span></span><b></b></div>
+          <div class="login-signal-label label-satellite">SATELLITE LINK: ACTIVE</div>
+          <div class="login-signal-label label-sensors">SENSOR NETWORK: ONLINE</div>
+          <div class="login-signal-label label-model">AI RISK ENGINE: READY</div>
+          <div class="login-signal-label label-geo">GEOSPATIAL MODEL: ACTIVE</div>
+        </div>
+        <div class="login-topline">
+          <div class="login-brand" id="loginBrandMount"></div>
+          <div class="login-principles"><span>EARLY ALERT</span><i></i><span>FASTER RESPONSE</span><i></i><span>SAFER TOMORROW</span></div>
+        </div>
+        <div class="login-content">
+          <div class="brand-block">
+            <div class="brand-tag login-kicker"><span class="kicker-dot"></span>PROTOTYPE AUTHENTICATION</div>
+            <h1><span>BHOOSHANKET</span> <em>AI</em></h1>
+            <div class="brand-subtitle">AI DISASTER INTELLIGENCE &amp; EMERGENCY RESPONSE PLATFORM</div>
+            <p>
+              Predict. Alert. Respond. Protect. Environmental signals become early warning,
+              operational intelligence, and coordinated emergency response.
+            </p>
+            <div class="status-row">
+              <span>SIMULATED COMMAND ENVIRONMENT</span>
+            </div>
+            <div class="login-intelligence">
+              <div class="signal-lines" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+              <div><small>REGIONAL INTELLIGENCE</small><strong>NORTH-EAST INDIA / LIVE SIMULATION</strong></div>
+              <div class="login-coordinates">25.57° N<br>91.88° E</div>
+            </div>
+            <div class="risk-strip" aria-label="Prototype risk monitoring categories">
+              <span><b>◒</b>FLOOD RISK</span><span><b>⌁</b>EARTHQUAKE</span><span class="risk-active"><b>△</b>LANDSLIDE</span><span><b>☼</b>WEATHER ALERT</span>
+            </div>
+          </div>
+
+          <div class="login-panel">
+            <div class="panel-header">
+              <span class="dot"></span>
+              <span>Authority Sign In</span>
+              <small>SECURE PROTOTYPE ACCESS</small>
+            </div>
+            <form id="loginForm">
+              <label>
+                <span>Email</span>
+                <input id="loginEmail" type="email" autocomplete="username" placeholder="Enter your email address" required />
+              </label>
+              <label>
+                <span>Passcode</span>
+                <div class="password-wrap">
+                  <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Enter your passcode" required />
+                  <button type="button" id="togglePassword" class="toggle-password" aria-label="Show passcode">Show</button>
+                </div>
+              </label>
+              <p class="login-error hidden" id="loginError">Invalid email or passcode.</p>
+              <p class="auth-status hidden" id="authStatus" role="status" aria-live="polite"></p>
+              <label class="inline-check">
+                <input type="checkbox" id="rememberMe" />
+                <span>Remember Me</span>
+              </label>
+              <button type="submit" class="primary-btn large login-submit"><span>→</span><b>SIGN IN</b></button>
+              <button type="button" id="forgotPasscode" class="text-link">Forgot Passcode</button>
+              <p class="auth-note">Prototype authentication only. Credentials are loaded from local environment variables and are never displayed in the interface.</p>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="app-shell hidden" id="appShell">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-brand-mount" id="sidebarBrandMount"></div>
+
+          <nav class="menu">
+            <p class="nav-group">Command Center</p>
+            <button class="nav-item active" data-view="dashboard"><span>◈</span>Dashboard</button>
+            <button class="nav-item" data-view="map"><span>⌖</span>Live Risk Map</button>
+            <button class="nav-item" data-view="prediction"><span>✦</span>AI Prediction</button>
+            <button class="nav-item" data-view="analytics"><span>▤</span>Intelligence Analytics</button>
+            <p class="nav-group">Environment</p>
+            <button class="nav-item" data-view="weather"><span>☼</span>Weather Intelligence</button>
+            <button class="nav-item" data-view="sensors"><span>◍</span>Sensor Monitoring</button>
+            <p class="nav-group">Emergency</p>
+            <button class="nav-item" data-view="alerts"><span>⚑</span>Alert Center</button>
+            <button class="nav-item" data-view="communication"><span>✉</span>Emergency Communication</button>
+            <button class="nav-item" data-view="authority"><span>▣</span>Authority Response</button>
+            <button class="nav-item" data-view="rescue"><span>⌁</span>Rescue Team</button>
+            <p class="nav-group">Citizen Safety</p>
+            <button class="nav-item" data-view="citizen"><span>☏</span>Citizen Safety</button>
+            <button class="nav-item" data-view="route"><span>⇢</span>Safe Route</button>
+            <button class="nav-item" data-view="zones"><span>◎</span>Safe Zones</button>
+            <button class="nav-item" data-view="precautions"><span>⚠</span>Safety Precautions</button>
+            <button class="nav-item" data-view="contacts"><span>☎</span>Emergency Contacts</button>
+            <p class="nav-group">System</p>
+            <button class="nav-item" data-view="energy"><span>◐</span>Energy Control</button>
+            <button class="nav-item" data-view="settings"><span>⚙</span>Settings</button>
+          </nav>
+
+          <div class="sidebar-footer">
+            <div class="mini-metric">
+              <span>Operational Mode</span>
+              <strong id="systemModeLabel">ACTIVE MONITORING</strong>
+            </div>
+            <div class="mini-metric">
+              <span>System Status</span>
+              <strong id="systemStatusLabel">STABLE</strong>
+            </div>
+          </div>
+        </aside>
+
+        <main class="main-panel">
+          <header class="topbar">
+            <div class="topbar-title">
+              <button type="button" class="icon-btn mobile-nav" id="sidebarToggle" aria-label="Open navigation">☰</button>
+              <div class="header-brand-mount" id="headerBrandMount"></div>
+              <div>
+                <div class="eyebrow" id="greetingLine">COMMAND AUTHORITY</div>
+                <h2>BhooShanket AI Command Center</h2>
+              </div>
+            </div>
+            <div class="region-breadcrumb" id="regionBreadcrumb" aria-label="Regional intelligence context">
+              <span>REGIONAL INTELLIGENCE</span><strong>NORTH-EAST INDIA</strong><i>›</i><strong id="headerState">MEGHALAYA</strong><i>›</i><strong id="headerDistrict">EAST KHASI HILLS</strong><i>›</i><strong id="headerZone">SHILLONG ZONE</strong>
+            </div>
+            <div class="topbar-actions">
+              <div class="live-status">
+                <span class="pulse"></span>
+                LIVE MONITORING
+              </div>
+              <div class="sim-label">SIMULATED DATA</div>
+              <div class="date-pill" id="dateStamp">—</div>
+              <div class="clock-pill" id="clockStamp">—</div>
+              <div class="notification-menu">
+                <button type="button" class="notification-bell" id="notificationBell" aria-label="Open notifications" aria-expanded="false">
+                  <span class="bell-icon">🔔</span>
+                  <span id="notificationCount" class="notif-badge">0</span>
+                </button>
+                <div class="notification-popover" id="notificationPopover" aria-hidden="true">
+                  <div class="notification-popover-head">
+                    <div>
+                      <strong>Notification Center</strong>
+                      <small>SIMULATED EVENT STREAM</small>
+                    </div>
+                  </div>
+                  <div class="notif-items" id="notificationCenter"></div>
+                  <button type="button" class="action-btn wide" data-goto="alerts">OPEN ALERT CENTER</button>
+                </div>
+              </div>
+              <button type="button" class="ghost-btn" id="themeToggle" aria-label="Toggle theme">🌙 DARK</button>
+              <button class="primary-btn demo-btn" id="startDemoBtn">▶ START LIVE DEMO</button>
+              <button type="button" class="profile-pill" id="profileBtn" data-view="settings">
+                <span class="avatar">A</span>
+                <div>
+                  <strong>Authority</strong>
+                  <small>Regional Ops</small>
+                </div>
+              </button>
+            </div>
+          </header>
+
+          <section class="view active" data-view-panel="dashboard">
+            <div class="metrics-grid" id="metricsGrid"></div>
+            <div class="content-grid dashboard-grid">
+              <div class="card risk-card large-card">
+                <div class="card-header">
+                  <div>
+                    <div class="eyebrow">CURRENT LANDSLIDE RISK</div>
+                    <h3 id="selectedLocationName">Shillong Monitoring Zone</h3>
+                  </div>
+                  <div class="location-selectors compact inline">
+                    <select id="stateSelect" aria-label="State"></select>
+                    <select id="districtSelect" aria-label="District"></select>
+                    <select id="zoneSelect" aria-label="Monitoring zone"></select>
+                  </div>
+                </div>
+
+                <div class="risk-main">
+                  <div class="risk-instrument">
+                    <div class="risk-gauge" id="riskGauge">
+                      <div class="gauge-scan"></div>
+                      <div class="gauge-inner">
+                        <strong id="riskPercent">78%</strong>
+                        <span id="riskLevelText">HIGH RISK</span>
+                      </div>
+                    </div>
+                    <div class="instrument-meta">
+                      <div><span>AI CONFIDENCE</span><strong id="aiConfidenceValue">94%</strong></div>
+                      <div><span>REGION</span><strong id="regionIndicator">Meghalaya • Zone</strong></div>
+                      <div><span>UPDATED</span><strong id="riskTimestamp">—</strong></div>
+                    </div>
+                    <svg class="mini-trend" id="riskMiniTrend" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"></svg>
+                  </div>
+                  <div class="risk-details">
+                    <div class="fact-list">
+                      <div><span>Rainfall</span><strong id="rainfallFact">HIGH</strong></div>
+                      <div><span>Soil Moisture</span><strong id="moistureFact">HIGH</strong></div>
+                      <div><span>Slope Movement</span><strong id="movementFact">ELEVATED</strong></div>
+                      <div><span>Weather Condition</span><strong id="conditionFact">HEAVY RAIN</strong></div>
+                    </div>
+                    <p id="aiInsight">Persistent rainfall and increasing soil saturation are contributing to elevated slope instability.</p>
+                    <div class="why-box">
+                      <h4>WHY DID THE AI PREDICT THIS?</h4>
+                      <p id="riskMatterText">Increased rainfall and ground saturation reduce slope strength, raising the chance of slope failure during short, intense downpours.</p>
+                      <div class="bars" id="dashboardContributionBars"></div>
+                      <div class="inline-actions">
+                        <button type="button" class="action-btn" data-goto="prediction">VIEW AI ANALYSIS</button>
+                        <button type="button" class="action-btn" data-goto="map">OPEN RISK MAP</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card weather-card">
+                <div class="card-header split">
+                  <div>
+                    <div class="eyebrow">ENVIRONMENTAL INTELLIGENCE</div>
+                    <h3>Current Weather</h3>
+                  </div>
+                  <div class="badge danger" id="weatherBadge">SIMULATED ENVIRONMENTAL DATA</div>
+                </div>
+                <div class="weather-grid" id="weatherGrid"></div>
+              </div>
+            </div>
+            <div class="dashboard-lower">
+              <div class="card">
+                <div class="card-header split">
+                  <div>
+                    <div class="eyebrow">LIVE INCIDENTS</div>
+                    <h3>Incident Command Feed</h3>
+                  </div>
+                  <button type="button" class="action-btn" data-goto="alerts">ALERT CENTER</button>
+                </div>
+                <div class="incident-feed" id="liveIncidentFeed"></div>
+              </div>
+              <div class="card">
+                <div class="card-header split">
+                  <div>
+                    <div class="eyebrow">LIVE SENSOR TELEMETRY</div>
+                    <h3>Network Waveforms</h3>
+                  </div>
+                  <button type="button" class="action-btn" data-goto="sensors">SENSOR MONITORING</button>
+                </div>
+                <div class="telemetry-grid" id="telemetryGrid"></div>
+              </div>
+            </div>
+            <div class="dashboard-ops">
+              <div class="card">
+                <div class="card-header split">
+                  <div>
+                    <div class="eyebrow">AUTHORITY RESPONSE</div>
+                    <h3>Active Emergencies</h3>
+                  </div>
+                  <button type="button" class="action-btn" data-goto="authority">OPEN RESPONSE CENTER</button>
+                </div>
+                <div id="dashboardIncidents"></div>
+              </div>
+              <div class="card">
+                <div class="card-header split">
+                  <div>
+                    <div class="eyebrow">RESCUE OPERATIONS</div>
+                    <h3>Team Status</h3>
+                  </div>
+                  <button type="button" class="action-btn" data-goto="rescue">OPEN RESCUE</button>
+                </div>
+                <div id="dashboardRescue"></div>
+              </div>
+            </div>
+            <div class="card command-log-card">
+              <div class="card-header split">
+                <div>
+                  <div class="eyebrow">OPERATIONAL EVENT STREAM</div>
+                  <h3>Incident Command Timeline</h3>
+                </div>
+                <div class="badge neutral">AUDITABLE SIMULATION LOG</div>
+              </div>
+              <div class="command-log" id="commandLog"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="map">
+            <div class="card map-card">
+              <div class="card-header split">
+                <div>
+                  <div class="eyebrow">INTERACTIVE NORTH EAST INDIA RISK MAP</div>
+                  <h3>Live Risk Map</h3>
+                </div>
+                <div class="map-controls">
+                  <input type="text" id="searchLocation" placeholder="Search location" />
+                  <select id="mapStateFilter"></select>
+                  <select id="mapDistrictFilter"></select>
+                  <select id="mapRiskFilter">
+                    <option value="all">All Risk</option>
+                    <option value="LOW">Low Risk</option>
+                    <option value="MEDIUM">Medium Risk</option>
+                    <option value="HIGH">High Risk</option>
+                    <option value="CRITICAL">Critical Risk</option>
+                  </select>
+                  <select id="mapSensorFilter">
+                    <option value="all">All Sensors</option>
+                    <option value="online">Online</option>
+                    <option value="warning">Warning</option>
+                    <option value="offline">Offline</option>
+                  </select>
+                  <select id="mapLayerFilter">
+                    <option value="standard">STANDARD</option>
+                    <option value="terrain">TERRAIN &amp; TOPOGRAPHY</option>
+                    <option value="heatmap">LANDSLIDE RISK HEATMAP</option>
+                    <option value="sensors">SENSOR NETWORK</option>
+                    <option value="rainfall">RAINFALL RADAR</option>
+                    <option value="slope">SLOPE MOVEMENT VECTORS</option>
+                    <option value="safe">SAFE ZONES &amp; SHELTERS</option>
+                    <option value="incidents">ACTIVE INCIDENTS &amp; RESCUE</option>
+                  </select>
+                  <div class="map-zoom-tools">
+                    <button type="button" class="icon-btn map-btn" id="mapZoomIn" title="Zoom In" aria-label="Zoom In">+</button>
+                    <button type="button" class="icon-btn map-btn" id="mapZoomOut" title="Zoom Out" aria-label="Zoom Out">−</button>
+                    <button type="button" class="icon-btn map-btn" id="mapZoomReset" title="Reset View" aria-label="Reset View">⊙</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="map-layout">
+                <div class="map-viewport" id="mapViewport"></div>
+                <aside class="intel-panel" id="mapInfoPanel"></aside>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="prediction">
+            <div class="card prediction-card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">AI LANDSLIDE RISK PREDICTION ENGINE</div>
+                  <h3>Prototype AI Simulation</h3>
+                </div>
+                <div class="badge neutral">TRANSPARENT WEIGHTED RISK MODEL</div>
+              </div>
+
+              <div class="prediction-layout">
+                <div class="controls-panel">
+                  <div class="slider-group">
+                    <label>Rainfall Intensity <span id="rainIntensityValue">82 mm/hr</span></label>
+                    <input type="range" id="rainIntensity" min="0" max="100" value="82" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Rainfall in Last 24 Hours <span id="rain24Value">132 mm</span></label>
+                    <input type="range" id="rain24" min="0" max="220" value="132" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Rainfall in Last 72 Hours <span id="rain72Value">322 mm</span></label>
+                    <input type="range" id="rain72" min="0" max="500" value="322" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Soil Moisture <span id="soilValue">78%</span></label>
+                    <input type="range" id="soilMoisture" min="0" max="100" value="78" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Slope Movement <span id="slopeMoveValue">66 mm</span></label>
+                    <input type="range" id="slopeMovement" min="0" max="100" value="66" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Slope Angle <span id="slopeAngleValue">39°</span></label>
+                    <input type="range" id="slopeAngle" min="10" max="60" value="39" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Temperature <span id="temperatureValue">22°C</span></label>
+                    <input type="range" id="temperature" min="0" max="40" value="22" />
+                  </div>
+                  <div class="slider-group">
+                    <label>Humidity <span id="humidityValue">88%</span></label>
+                    <input type="range" id="humidity" min="0" max="100" value="88" />
+                  </div>
+                  <div class="select-group">
+                    <label>Weather Condition</label>
+                    <select id="weatherCondition">
+                      <option value="heavyRain" selected>Heavy Rain</option>
+                      <option value="storm">Storm</option>
+                      <option value="cloudburst">Cloudburst</option>
+                      <option value="clear">Clear</option>
+                    </select>
+                  </div>
+                  <button class="primary-btn" id="runAiAnalysis">RUN AI ANALYSIS</button>
+                </div>
+
+                <div class="prediction-output">
+                  <div class="ai-score-box">
+                    <span class="kicker">LANDSLIDE PROBABILITY</span>
+                    <strong id="aiProbability">78%</strong>
+                    <small id="aiRiskLabel">HIGH RISK</small>
+                  </div>
+                  <div class="forecast-strip" id="forecastStrip"></div>
+                  <div class="pipeline">
+                    <span>ENVIRONMENTAL DATA</span>
+                    <span>↓</span>
+                    <span>DATA PROCESSING</span>
+                    <span>↓</span>
+                    <span>FEATURE ANALYSIS</span>
+                    <span>↓</span>
+                    <span>AI RISK ENGINE</span>
+                    <span>↓</span>
+                    <span>LANDSLIDE PROBABILITY</span>
+                    <span>↓</span>
+                    <span>EARLY WARNING DECISION</span>
+                  </div>
+                  <div class="impact-card">
+                    <h4>WHY DID THE AI PREDICT THIS?</h4>
+                    <ul id="aiReasonList"></ul>
+                  </div>
+                  <div class="contribution-box">
+                    <h4>Risk Contribution Model</h4>
+                    <div class="bars" id="riskContributionBars"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="weather">
+            <div class="card">
+              <div class="card-header split">
+                <div>
+                  <div class="eyebrow">REAL-TIME WEATHER INTELLIGENCE</div>
+                  <h3>Weather Monitoring</h3>
+                </div>
+                <div class="location-selectors compact">
+                  <select id="weatherState" aria-label="Weather state"></select>
+                  <select id="weatherDistrict" aria-label="Weather district"></select>
+                  <select id="weatherZone" aria-label="Weather zone"></select>
+                </div>
+              </div>
+              <div class="intel-toolbar">
+                <select id="weatherTimeRange" aria-label="Time range">
+                  <option value="24H">24 HOURS</option>
+                  <option value="7D">7 DAYS</option>
+                  <option value="30D">30 DAYS</option>
+                </select>
+                <div class="toggle-row" id="weatherMetricToggles">
+                  <button type="button" class="period-btn active" data-metric="rainfall">Rainfall</button>
+                  <button type="button" class="period-btn" data-metric="humidity">Humidity</button>
+                  <button type="button" class="period-btn" data-metric="temperature">Temperature</button>
+                  <button type="button" class="period-btn" data-metric="wind">Wind Speed</button>
+                  <button type="button" class="period-btn" data-metric="soil">Soil Moisture</button>
+                </div>
+              </div>
+              <div class="weather-hero" id="weatherHero"></div>
+              <div class="chart-box wide weather-compare">
+                <h4>ENVIRONMENTAL COMPARISON — SIMULATED DATA</h4>
+                <canvas id="weatherCompareChart"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="sensors">
+            <div class="card">
+              <div class="card-header split">
+                <div>
+                  <div class="eyebrow">SENSOR MONITORING</div>
+                  <h3>IoT Network Health</h3>
+                </div>
+                <div class="badge neutral">SIMULATED SENSOR VALUES</div>
+              </div>
+              <div class="sensor-summary" id="sensorSummary"></div>
+              <div class="sensor-grid" id="sensorGrid"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="alerts">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">ALERT CENTER</div>
+                  <h3>Emergency Alert Intelligence Center</h3>
+                </div>
+              </div>
+              <div class="alert-list" id="alertList"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="communication">
+            <div class="card comm-card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">EMERGENCY COMMUNICATION SYSTEM</div>
+                  <h3>Multi-Platform Alert Dispatch</h3>
+                </div>
+              </div>
+
+              <div class="comm-grid">
+                <div class="comm-form">
+                  <label>Location<select id="commLocation"></select></label>
+                  <label>Risk Level<select id="commRiskLevel"><option>HIGH</option><option>CRITICAL</option><option>MEDIUM</option></select></label>
+                  <label>Target Group<select id="commTargetGroup"><option>Villagers</option><option>Tourists</option><option>Local Authorities</option><option>Transit Routes</option></select></label>
+                  <label>Communication Channel<select id="commChannel"><option>SMS</option><option>WHATSAPP</option><option>TELEGRAM</option><option>EMERGENCY BROADCAST</option></select></label>
+                  <button class="primary-btn" id="generateAlert">GENERATE ALERT MESSAGE</button>
+                  <button type="button" class="secondary-btn" id="sendSimAlert">SEND ALERT (PROTOTYPE)</button>
+                  <p class="auth-note">PROTOTYPE COMMUNICATION SIMULATION — no real messages are sent.</p>
+                </div>
+                <div class="comm-message">
+                  <div class="status-timeline" id="commTimeline"></div>
+                  <div class="message-box" id="commMessageBox"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="authority">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">AUTHORITY RESPONSE SYSTEM</div>
+                  <h3>Incident Management</h3>
+                </div>
+              </div>
+              <div class="incident-table" id="incidentTable"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="rescue">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">RESCUE TEAM TASK MANAGEMENT</div>
+                  <h3>Rescue Operations</h3>
+                </div>
+              </div>
+              <div class="rescue-grid" id="rescueGrid"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="citizen">
+            <div class="card citizen-card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">CITIZEN SAFETY INTERFACE</div>
+                  <h3>Are You Safe?</h3>
+                </div>
+              </div>
+              <div class="citizen-status">
+                <button class="safe-btn" id="citizenSafe">✓ I AM SAFE</button>
+                <button class="help-btn" id="citizenHelp">🆘 I NEED HELP</button>
+              </div>
+              <div class="citizen-response" id="citizenResponse"></div>
+              <div class="help-form hidden" id="helpForm">
+                <div class="form-grid">
+                  <label>Name<input type="text" id="helpName" /></label>
+                  <label>Phone Number<input type="tel" id="helpPhone" /></label>
+                  <label>Location<input type="text" id="helpLocation" /></label>
+                  <label>Emergency Type<select id="helpType"><option>Medical</option><option>Evacuation</option><option>Structural Risk</option><option>Trapped</option></select></label>
+                </div>
+                <label>Additional Note<textarea id="helpNote" rows="3"></textarea></label>
+                <button class="primary-btn" id="sendHelpRequest">SEND HELP REQUEST</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="route">
+            <div class="card route-card-shell">
+              <div class="card-header split">
+                <div>
+                  <div class="eyebrow">INTELLIGENT SAFE ROUTE FINDER</div>
+                  <h3>Find Safest Route</h3>
+                </div>
+                <div class="badge neutral" id="routeModeBadge">TERRAIN RISK AVOIDANCE</div>
+              </div>
+              <div class="route-reroute-banner hidden" id="routeRerouteBanner" role="alert">
+                <span class="reroute-pulse"></span>
+                <div class="reroute-info">
+                  <strong id="rerouteTitle">ROUTE RISK INCREASED</strong>
+                  <p id="rerouteSubtitle">Slope sensor anomaly detected along Primary Corridor. Recalculating...</p>
+                </div>
+                <span class="status-chip warning" id="rerouteBadge">RECALCULATING</span>
+              </div>
+              <div class="route-inputs">
+                <label>Current Location<select id="routeFrom"></select></label>
+                <label>Destination<select id="routeTo"></select></label>
+                <button type="button" class="primary-btn" id="findRouteBtn">FIND SAFEST ROUTE</button>
+              </div>
+              <div class="route-corridor-tabs" id="routeCorridorTabs">
+                <button type="button" class="period-btn active" data-corridor="safest">✓ Safest Route (Recommended)</button>
+                <button type="button" class="period-btn" data-corridor="alternative">⇢ Alternative Route</button>
+                <button type="button" class="period-btn" data-corridor="highrisk">⚠ High-Risk Route (Restricted)</button>
+              </div>
+              <p class="auth-note">PROTOTYPE ROUTE SIMULATION</p>
+              <div class="route-panel" id="routePanel"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="zones">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">SAFE ZONE FINDER</div>
+                  <h3>Nearby Safe Locations</h3>
+                </div>
+              </div>
+              <div class="safe-zone-grid" id="safeZoneGrid"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="precautions">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">SAFETY PRECAUTIONS</div>
+                  <h3>Prototype Safety Guidance</h3>
+                </div>
+              </div>
+              <div class="toggle-row" id="precautionTabs">
+                <button type="button" class="period-btn" data-risk-tab="LOW">LOW</button>
+                <button type="button" class="period-btn" data-risk-tab="MEDIUM">MEDIUM</button>
+                <button type="button" class="period-btn" data-risk-tab="HIGH">HIGH</button>
+                <button type="button" class="period-btn" data-risk-tab="CRITICAL">CRITICAL</button>
+              </div>
+              <div class="precaution-list" id="precautionList"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="analytics">
+            <div class="card analytics-card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">INTELLIGENCE ANALYTICS</div>
+                  <h3>Disaster Intelligence Overview</h3>
+                </div>
+                <div class="toggle-row">
+                  <button class="period-btn active" data-period="24H">24 HOURS</button>
+                  <button class="period-btn" data-period="7D">7 DAYS</button>
+                  <button class="period-btn" data-period="30D">30 DAYS</button>
+                  <button class="period-btn" data-period="3M">3 MONTHS</button>
+                </div>
+              </div>
+
+              <div class="chart-grid">
+                <div class="chart-box large">
+                  <h4>LANDSLIDE RISK TREND</h4>
+                  <canvas id="riskTrendChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>RAINFALL VS LANDSLIDE RISK</h4>
+                  <canvas id="rainRiskChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>AI RISK FACTOR CONTRIBUTION</h4>
+                  <canvas id="factorChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>RISK DISTRIBUTION</h4>
+                  <canvas id="riskDistributionChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>MOST VULNERABLE LOCATIONS</h4>
+                  <canvas id="vulnerableChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>ALERT FREQUENCY</h4>
+                  <canvas id="alertFrequencyChart"></canvas>
+                </div>
+                <div class="chart-box wide">
+                  <h4>WEATHER HISTORY — SIMULATED DATA</h4>
+                  <div class="toggle-row" id="historyMetricToggles">
+                    <button type="button" class="period-btn active" data-history="rainfall">Rainfall</button>
+                    <button type="button" class="period-btn" data-history="humidity">Humidity</button>
+                    <button type="button" class="period-btn" data-history="temperature">Temperature</button>
+                    <button type="button" class="period-btn" data-history="wind">Wind Speed</button>
+                  </div>
+                  <canvas id="weatherHistoryChart"></canvas>
+                </div>
+                <div class="chart-box">
+                  <h4>SENSOR NETWORK HEALTH</h4>
+                  <canvas id="sensorHealthChart"></canvas>
+                </div>
+                <div class="chart-box wide">
+                  <h4>HISTORICAL RISK HEATMAP</h4>
+                  <canvas id="heatmapChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="contacts">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">EMERGENCY AUTHORITY CONTACTS</div>
+                  <h3>Response Network</h3>
+                </div>
+              </div>
+              <div class="contacts-grid" id="contactGrid"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="energy">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">SMART ENERGY CONTROL AND NIGHT MODE</div>
+                  <h3>Monitoring Operations</h3>
+                </div>
+              </div>
+              <div class="energy-grid" id="energyGrid"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view-panel="settings">
+            <div class="card settings-card">
+              <div class="card-header">
+                <div>
+                  <div class="eyebrow">SYSTEM CONTROLS</div>
+                  <h3>Settings</h3>
+                </div>
+              </div>
+              <div class="settings-panel">
+                <div class="setting-group">
+                  <h4>Language Selector</h4>
+                  <div class="lang-switcher">
+                    <button class="lang-btn active" data-lang="en">ENGLISH</button>
+                    <button class="lang-btn" data-lang="hi">HINDI</button>
+                    <button class="lang-btn" data-lang="future">Regional languages — future</button>
+                  </div>
+                  <p class="auth-note" id="langNote">English and Hindi are active. Additional North-Eastern languages are reserved for future expansion.</p>
+                </div>
+                <div class="setting-group">
+                  <h4>Interface Theme</h4>
+                  <p class="auth-note">Theme is independent from operational energy modes.</p>
+                  <div class="lang-switcher">
+                    <button type="button" class="lang-btn" id="settingsLight">☀ LIGHT</button>
+                    <button type="button" class="lang-btn" id="settingsDark">🌙 DARK</button>
+                  </div>
+                </div>
+                <div class="setting-group">
+                  <h4>Operational Mode (read-only here)</h4>
+                  <p class="auth-note">Change modes in Energy Control. Emergency readiness remains active in all modes.</p>
+                  <div class="status-stack" id="settingsModeStack"></div>
+                </div>
+                <div class="setting-group">
+                  <h4>Session</h4>
+                  <p class="auth-note">Prototype client-side authentication. Logging out returns to the sign-in screen.</p>
+                  <button type="button" class="secondary-btn" id="logoutBtn">LOG OUT</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <button type="button" class="assistant-launcher" id="assistantLauncher" aria-label="Open BhooShanket Safety Assistant">
+      <span class="assistant-launcher-icon">✦</span>
+      <span><strong>BhooShanket AI</strong><small>Safety Assistant</small></span>
+      <i></i>
+    </button>
+
+    <div class="floating-assistant minimized" id="assistantBox" aria-label="BhooShanket Safety Assistant">
+      <div class="assistant-header">
+        <span class="assistant-dot"></span>
+        <div>
+          <strong>BhooShanket Safety Assistant</strong>
+          <small>Operational response copilot</small>
+        </div>
+        <div class="assistant-controls">
+          <button type="button" id="assistantMinimize" aria-label="Minimize assistant">−</button>
+          <button type="button" id="assistantMaximize" aria-label="Maximize assistant">⛶</button>
+          <button type="button" id="assistantClose" aria-label="Close assistant">×</button>
+        </div>
+      </div>
+      <div class="assistant-context" id="assistantContext"></div>
+      <div class="assistant-answers" id="assistantAnswers"></div>
+      <div class="assistant-command">
+        <input id="assistantQuery" type="text" placeholder="Ask about risk, route, or response" />
+        <button id="assistantSend" type="button" aria-label="Send assistant question">↗</button>
+      </div>
+      <div class="assistant-actions">
+        <button data-question="What is the current risk?">What is the current risk?</button>
+        <button data-question="Why is the risk high?">Why is the risk high?</button>
+        <button data-question="What is the rainfall?">What is the rainfall?</button>
+        <button data-question="Which zone is critical?">Which zone is critical?</button>
+        <button data-question="Where is the nearest safe zone?">Where is the nearest safe zone?</button>
+        <button data-question="Which route should I avoid?">Which route should I avoid?</button>
+        <button data-question="How many sensors are online?">How many sensors are online?</button>
+        <button data-question="What happened during the Live Demo?">What happened during Live Demo?</button>
+        <button data-question="How can I report an emergency?">How can I report an emergency?</button>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
