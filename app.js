@@ -263,10 +263,12 @@ function clearAuth() {
 
 function applyTheme(theme) {
   appState.theme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.classList.add('theme-transitioning');
   document.documentElement.dataset.theme = appState.theme;
   localStorage.setItem(THEME_KEY, appState.theme);
   const toggle = document.getElementById('themeToggle');
   if (toggle) toggle.textContent = appState.theme === 'light' ? '☀ LIGHT' : '🌙 DARK';
+  window.setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 320);
 }
 
 function nowStamp() {
@@ -1649,16 +1651,17 @@ const intelligenceCrosshairPlugin = {
 };
 
 function getCustomChartTooltip(extraMetrics = true) {
+  const light = appState.theme === 'light';
   return {
     enabled: true,
     mode: 'index',
     intersect: false,
-    backgroundColor: 'rgba(6, 14, 25, 0.95)',
-    titleColor: '#6be3ff',
+    backgroundColor: light ? 'rgba(255, 255, 255, 0.98)' : 'rgba(6, 14, 25, 0.95)',
+    titleColor: light ? '#0a73b8' : '#6be3ff',
     titleFont: { family: "'IBM Plex Mono', monospace", size: 11, weight: '600' },
-    bodyColor: '#edf5ff',
+    bodyColor: light ? '#193850' : '#edf5ff',
     bodyFont: { family: "'IBM Plex Sans', sans-serif", size: 12 },
-    borderColor: 'rgba(66, 196, 255, 0.35)',
+    borderColor: light ? 'rgba(27, 139, 199, 0.32)' : 'rgba(66, 196, 255, 0.35)',
     borderWidth: 1,
     padding: 12,
     boxPadding: 6,
@@ -1707,6 +1710,10 @@ function getCustomChartTooltip(extraMetrics = true) {
 function renderCharts() {
   appState.chartInstances.forEach(chart => chart.destroy());
   appState.chartInstances = [];
+  const chartText = appState.theme === 'light' ? '#25445d' : '#edf5ff';
+  const chartMuted = appState.theme === 'light' ? '#667c90' : '#9bb2d1';
+  const chartGrid = appState.theme === 'light' ? 'rgba(39, 95, 133, 0.11)' : 'rgba(120, 175, 230, 0.1)';
+  const chartGridSoft = appState.theme === 'light' ? 'rgba(39, 95, 133, 0.07)' : 'rgba(120, 175, 230, 0.08)';
   if (typeof Chart !== 'undefined' && !Chart.registry.plugins.get('intelligenceCrosshair')) {
     Chart.register(intelligenceCrosshairPlugin);
   }
@@ -1757,8 +1764,8 @@ function renderCharts() {
           tooltip: getCustomChartTooltip(true)
         },
         scales: {
-          y: { grid: { color: 'rgba(120, 175, 230, 0.1)' }, ticks: { color: 'var(--muted)', callback: v => `${v}%` } },
-          x: { grid: { color: 'rgba(120, 175, 230, 0.08)' }, ticks: { color: 'var(--muted)' } }
+          y: { grid: { color: chartGrid }, ticks: { color: chartMuted, callback: v => `${v}%` } },
+          x: { grid: { color: chartGridSoft }, ticks: { color: chartMuted } }
         }
       }
     }));
@@ -1781,12 +1788,12 @@ function renderCharts() {
         onClick: null,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: true, labels: { color: 'var(--text)' } },
+          legend: { display: true, labels: { color: chartText } },
           tooltip: getCustomChartTooltip(true)
         },
         scales: {
-          y: { grid: { color: 'rgba(120, 175, 230, 0.1)' }, ticks: { color: 'var(--muted)' } },
-          x: { grid: { color: 'rgba(120, 175, 230, 0.08)' }, ticks: { color: 'var(--muted)' } }
+          y: { grid: { color: chartGrid }, ticks: { color: chartMuted } },
+          x: { grid: { color: chartGridSoft }, ticks: { color: chartMuted } }
         }
       }
     }));
@@ -2602,7 +2609,10 @@ function initializeEvents() {
   document.getElementById('findRouteBtn')?.addEventListener('click', findSafestRoute);
   document.getElementById('settingsLight')?.addEventListener('click', () => { applyTheme('light'); renderAll(); });
   document.getElementById('settingsDark')?.addEventListener('click', () => { applyTheme('dark'); renderAll(); });
-  document.getElementById('themeToggle')?.addEventListener('click', () => { applyTheme(appState.theme === 'dark' ? 'light' : 'dark'); });
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    applyTheme(appState.theme === 'dark' ? 'light' : 'dark');
+    renderAll();
+  });
   document.getElementById('logoutBtn')?.addEventListener('click', () => { clearAuth(); showLogin(); showToast('Prototype session ended', 'info'); });
   document.getElementById('drawerOverlay')?.addEventListener('click', closeDrawer);
   document.addEventListener('click', event => { if (event.target.closest('#closeDrawer')) closeDrawer(); });
