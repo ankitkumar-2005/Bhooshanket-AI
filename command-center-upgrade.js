@@ -134,6 +134,29 @@ function addDemoControls() {
   start.after(controls);
 }
 
+function renderPhaseTracker() {
+  const tracker = document.getElementById('liveDemoTracker');
+  if (!tracker) return;
+  const phaseIndex = Math.max(0, Math.min(3, appState.phaseIndex || 0));
+  const phase = ['NORMAL', 'WARNING', 'HIGH RISK', 'CRITICAL'][phaseIndex];
+  const location = locationCatalog.find(item => item.id === appState.selectedLocationId) || locationCatalog[1];
+  const risk = appState.demoRiskOverride ?? location.risk;
+  tracker.innerHTML = `
+    <div class="demo-phase-head"><span>LIVE DEMO TRACKER</span><strong>PHASE ${String(phaseIndex + 1).padStart(2, '0')} / 04 · ${phase}</strong></div>
+    <div class="demo-phase-stats"><div><small>RISK</small><b>${risk}%</b></div><div><small>RAINFALL</small><b>${location.rainfall} mm/hr</b></div><div><small>SOIL MOISTURE</small><b>${location.soilMoisture}%</b></div><div><small>SLOPE MOVEMENT</small><b>${location.slopeMovement} mm</b></div></div>
+    <div class="demo-phase-progress" aria-label="Live demo phase ${phaseIndex + 1} of 4"><i style="width:${(phaseIndex + 1) * 25}%"></i></div>`;
+}
+
+function addPhaseTracker() {
+  const topbar = document.querySelector('.topbar-actions');
+  if (!topbar || document.getElementById('liveDemoTracker')) return;
+  const tracker = document.createElement('section');
+  tracker.id = 'liveDemoTracker';
+  tracker.className = 'live-demo-tracker';
+  topbar.appendChild(tracker);
+  renderPhaseTracker();
+}
+
 export function installCommandCenterUpgrade() {
   document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => requestAnimationFrame(renderAudit)));
   appState.commandEvents ||= [];
@@ -142,7 +165,9 @@ export function installCommandCenterUpgrade() {
   addAuditView();
   addSensorFilters();
   addDemoControls();
+  addPhaseTracker();
   renderAudit();
+  document.addEventListener('bhooshanket:simulation-rendered', renderPhaseTracker);
   document.addEventListener('click', event => {
     if (event.target.closest('[data-view="audit"]')) renderAudit();
   });

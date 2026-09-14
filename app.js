@@ -84,6 +84,9 @@ const appState = {
   ]
 };
 
+// One shared simulation source of truth for every operational module.
+const simulationStore = appState;
+
 const locationCatalog = [
   { id: 1, state: 'Assam', district: 'Cachar', name: 'Silchar Monitoring Zone', risk: 42, rainfall: 40, humidity: 71, temperature: 28, soilMoisture: 61, slopeMovement: 42, slopeAngle: 32, weather: 'Moderate Rain', sensorStatus: 'online', mapX: 23, mapY: 52, safeZones: ['Silchar Shelter', 'Khagrapur Assembly'] },
   { id: 2, state: 'Meghalaya', district: 'East Khasi Hills', name: 'Shillong Monitoring Zone', risk: 78, rainfall: 82, humidity: 88, temperature: 22, soilMoisture: 78, slopeMovement: 66, slopeAngle: 39, weather: 'Heavy Rain', sensorStatus: 'warning', mapX: 48, mapY: 32, safeZones: ['Shillong Shelter', 'Umiam Safe Point'] },
@@ -183,10 +186,10 @@ const metricTemplates = [
 ];
 
 const riskThresholds = {
-  LOW: { min: 0, max: 30 },
-  MEDIUM: { min: 31, max: 60 },
-  HIGH: { min: 61, max: 85 },
-  CRITICAL: { min: 86, max: 100 }
+  LOW: { min: 0, max: 29 },
+  MEDIUM: { min: 30, max: 59 },
+  HIGH: { min: 60, max: 79 },
+  CRITICAL: { min: 80, max: 100 }
 };
 
 const phaseDefinitions = [
@@ -199,14 +202,14 @@ const phaseDefinitions = [
 function getEndRiskLabel(value) {
   if (value < 30) return 'LOW';
   if (value < 60) return 'MEDIUM';
-  if (value < 86) return 'HIGH';
+  if (value < 80) return 'HIGH';
   return 'CRITICAL';
 }
 
 function getRiskColor(value) {
   if (value < 30) return 'var(--green)';
   if (value < 60) return 'var(--yellow)';
-  if (value < 86) return 'var(--orange)';
+  if (value < 80) return 'var(--orange)';
   return 'var(--red)';
 }
 
@@ -411,8 +414,21 @@ function countTo(element, next, suffix = '') {
   requestAnimationFrame(tick);
 }
 
-function setView(view) {
+function resetRouteScrollPosition() {
+  // The command center uses document/window scrolling (not a separate panel).
+  // Reset both targets so a prior long screen never leaks into a new route.
+  const root = document.scrollingElement;
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  if (root) { root.scrollTop = 0; root.scrollLeft = 0; }
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    if (root) { root.scrollTop = 0; root.scrollLeft = 0; }
+  });
+}
+
+function setView(view, { forceScroll = false } = {}) {
   if (!VIEWS.includes(view)) view = 'dashboard';
+  const isRouteChange = forceScroll || view !== appState.activeView;
   appState.activeView = view;
   document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
   document.querySelectorAll('.view').forEach(section => {
@@ -426,6 +442,7 @@ function setView(view) {
   if (location.hash.replace('#', '') !== view) history.replaceState(null, '', `#${view}`);
   document.body.classList.remove('nav-open');
   document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', 'false');
+  if (isRouteChange) resetRouteScrollPosition();
   if (view === 'analytics' || view === 'weather') renderCharts();
 }
 
@@ -448,7 +465,7 @@ function showApp() {
   document.getElementById('appShell').classList.remove('hidden');
   setAssistantState(sessionStorage.getItem(ASSISTANT_STATE_KEY) || 'minimized');
   const hashView = location.hash.replace('#', '');
-  setView(VIEWS.includes(hashView) ? hashView : 'dashboard');
+  setView(VIEWS.includes(hashView) ? hashView : 'dashboard', { forceScroll: true });
   const name = appState.authUser.name || 'Authority';
   const greeting = document.getElementById('greetingLine');
   if (greeting) greeting.textContent = `WELCOME BACK, ${name.toUpperCase()}`;
@@ -576,17 +593,17 @@ function renderNotifications() {
   const risk = riskScoreFromLocation(selected);
   const severity = risk >= riskThresholds.CRITICAL.min ? 'critical' : risk >= riskThresholds.HIGH.min ? 'warning' : 'normal';
   const notifications = [
-    `Risk in ${selected.name}: ${getEndRiskLabel(risk)}`,
-    `${phaseDefinitions[appState.phaseIndex].label}`,
-    `Priority action: ${risk >= riskThresholds.CRITICAL.min ? 'Evacuation prep' : risk >= riskThresholds.HIGH.min ? 'Escalated monitoring' : 'Routine watch'}`,
-    `Sensor health: ${selected.sensorStatus === 'warning' ? 'Elevated' : 'Nominal'}`,
-    `Telemetry: ${appState.telemetrySource}`
+    { text: `Risk in ${selected.name}: ${getEndRiskLabel(risk)}`, goto: 'map' },
+    { text: phaseDefinitions[appState.phaseIndex].label, goto: 'prediction' },
+    { text: `Priority action: ${risk >= riskThresholds.CRITICAL.min ? 'Evacuation prep' : risk >= riskThresholds.HIGH.min ? 'Escalated monitoring' : 'Routine watch'}`, goto: 'alerts' },
+    { text: `Sensor health: ${selected.sensorStatus === 'warning' ? 'Elevated' : 'Nominal'}`, goto: 'sensors' },
+    { text: `Telemetry: ${appState.telemetrySource}`, goto: 'weather' }
   ];
 
   const center = document.getElementById('notificationCenter');
   if (!center) return;
   center.innerHTML = notifications
-    .map(item => `<div class="notif-item ${severity}">${item}</div>`)
+    .map(item => `<button type="button" class="notif-item ${severity}" data-notification-goto="${item.goto}">${item.text}</button>`)
     .join('');
   const count = document.getElementById('notificationCount');
   if (count) count.textContent = String(Math.min(99, alertBank.filter(alert => alert.status !== 'Resolved').length + (severity === 'critical' ? 1 : 0)));
@@ -647,7 +664,7 @@ function renderMetrics() {
         <div class="trend" style="color: ${metric.color};">${metric.trend}</div>
       </div>
       <h4>${metric.label}</h4>
-      <div class="value" style="color: ${metric.color};">${metric.value}${metric.unit || ''}</div>
+      <div class="value" data-metric-value="${metric.value}" data-metric-suffix="${metric.unit || ''}" style="color: ${metric.color};">0${metric.unit || ''}</div>
       <div class="sparkline">
         <svg viewBox="0 0 100 40" preserveAspectRatio="none">
           <path d="M0 30 L18 26 L36 24 L52 16 L70 18 L86 8 L100 10" stroke="${metric.color}" fill="none" stroke-width="2.2" stroke-linecap="round" />
@@ -655,6 +672,9 @@ function renderMetrics() {
       </div>
     </button>
   `).join('');
+  document.querySelectorAll('[data-metric-value]').forEach(element => {
+    countTo(element, element.dataset.metricValue, element.dataset.metricSuffix || '');
+  });
 }
 
 function renderLocationSelectors() {
@@ -1775,6 +1795,11 @@ function renderCharts() {
   if (typeof Chart !== 'undefined' && !Chart.registry.plugins.get('intelligenceCrosshair')) {
     Chart.register(intelligenceCrosshairPlugin);
   }
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.animation = { duration: 720, easing: 'easeOutQuart' };
+    Chart.defaults.transitions ||= {};
+    Chart.defaults.transitions.active = { animation: { duration: 180 } };
+  }
 
   const ctxRiskTrend = document.getElementById('riskTrendChart');
   const ctxRainRisk = document.getElementById('rainRiskChart');
@@ -2628,6 +2653,13 @@ function initializeEvents() {
   document.getElementById('assistantClose')?.addEventListener('click', () => setAssistantState('closed'));
 
   document.addEventListener('click', event => {
+    const notification = event.target.closest('[data-notification-goto]');
+    if (notification) {
+      navigateTo(notification.dataset.notificationGoto);
+      document.getElementById('notificationPopover')?.classList.remove('open');
+      document.getElementById('notificationBell')?.setAttribute('aria-expanded', 'false');
+    }
+
     const goto = event.target.closest('[data-goto]');
     if (goto) navigateTo(goto.dataset.goto);
 
@@ -2757,6 +2789,13 @@ function renderAll() {
   renderCommandLog();
   renderAssistant();
   renderCommunicationDefaults();
+  document.body.classList.remove('simulation-update');
+  // Reflow is intentionally local: it restarts the short update pulse only
+  // after a shared simulation render, rather than animating continuously.
+  void document.body.offsetWidth;
+  document.body.classList.add('simulation-update');
+  window.setTimeout(() => document.body.classList.remove('simulation-update'), 720);
+  document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
 }
 
 function renderCommunicationDefaults() {
@@ -2991,6 +3030,7 @@ function startLiveDemo() {
 }
 
 function init() {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   applyTheme(appState.theme);
   applyLanguage();
   updateClock();
@@ -3015,7 +3055,7 @@ function init() {
 }
 
 export {
-  appState, locationCatalog, sensorCatalog, alertBank, incidentTableData,
+  appState, simulationStore, locationCatalog, sensorCatalog, alertBank, incidentTableData,
   rescueTeams, safeZoneData, emergencyContacts, navigateTo, renderAll,
   renderCommandLog, showToast, logCommand, getSelectedLocation,
   riskScoreFromLocation, getEndRiskLabel

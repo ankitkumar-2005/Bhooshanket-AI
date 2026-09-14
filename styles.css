@@ -3666,6 +3666,11 @@ html[data-theme="light"] #loginScreen #passwordInput:-webkit-autofill:focus {
   visibility: visible;
   transform: translateY(0) scale(1);
 }
+.notification-popover .notif-item {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
 .notification-popover-head {
   display: flex;
   justify-content: space-between;
@@ -3836,3 +3841,29 @@ html[data-theme="light"] #loginScreen #passwordInput:-webkit-autofill:focus {
   #themeToggle { order: 2; }
   .demo-btn { order: 3; }
 }
+
+/* Compact live-demo telemetry keeps the four-phase narrative visible without
+   turning the header into another dashboard. */
+.live-demo-tracker { flex: 1 1 260px; min-width: 250px; max-width: 360px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: rgba(13,23,38,.76); }
+.demo-phase-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font: 600 .56rem var(--mono); letter-spacing: .07em; }
+.demo-phase-head strong { color: var(--text); font-weight: 700; }
+.demo-phase-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 7px; }
+.demo-phase-stats small { display: block; color: var(--muted); font: 600 .5rem var(--mono); }
+.demo-phase-stats b { display: block; margin-top: 2px; color: var(--text); font-size: .68rem; white-space: nowrap; }
+.demo-phase-progress { height: 3px; margin-top: 7px; overflow: hidden; border-radius: 99px; background: rgba(130,170,205,.18); }
+.demo-phase-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--green)); transition: width .4s ease; }
+@media (max-width: 1280px) { .live-demo-tracker { order: 5; flex-basis: min(100%, 360px); } }
+@media (max-width: 560px) { .live-demo-tracker { order: 5; min-width: 100%; max-width: none; } }
+
+/* Data motion is event-bound: one short pulse signals a shared simulation
+   update without adding a distracting continuous animation to the UI. */
+body.simulation-update .metric-card .value,
+body.simulation-update .weather-box strong,
+body.simulation-update .sensor-card .readout strong { animation: dataValueUpdate 720ms cubic-bezier(.2,.8,.2,1) both; }
+body.simulation-update .risk-gauge { filter: brightness(1.08); }
+body.simulation-update .chart-box { animation: dataChartUpdate 720ms ease-out both; }
+.notification-bell:has(.notif-badge:not(:empty)) .notif-badge { animation: notificationBadgeSettle 420ms cubic-bezier(.2,.9,.3,1) both; }
+@keyframes dataValueUpdate { 0% { opacity: .45; transform: translateY(5px); } 60% { opacity: 1; transform: translateY(-1px); text-shadow: 0 0 15px rgba(84,190,255,.35); } 100% { transform: translateY(0); text-shadow: none; } }
+@keyframes dataChartUpdate { 0% { border-color: rgba(66,196,255,.55); box-shadow: 0 0 0 rgba(66,196,255,0); } 55% { box-shadow: 0 0 28px rgba(66,196,255,.12); } 100% { box-shadow: none; } }
+@keyframes notificationBadgeSettle { 0% { transform: scale(.65); } 70% { transform: scale(1.14); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { body.simulation-update .metric-card .value, body.simulation-update .weather-box strong, body.simulation-update .sensor-card .readout strong, body.simulation-update .chart-box, .notification-bell:has(.notif-badge:not(:empty)) .notif-badge { animation: none; } }
