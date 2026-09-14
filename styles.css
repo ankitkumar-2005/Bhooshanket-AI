@@ -3752,3 +3752,87 @@ html[data-theme="light"] #loginScreen #passwordInput:-webkit-autofill:focus {
 .audit-row time, .audit-row span { color: var(--muted); font: 600 .7rem var(--mono); letter-spacing: .04em; }
 .audit-row p { margin: 5px 0 0; color: var(--muted); font-size: .82rem; }
 @media (max-width: 600px) { .sensor-toolbar > * { width: 100%; } .sensor-toolbar input, .sensor-toolbar select { width: 100%; } .audit-row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Header notification control: keep the bell and its unread badge as two
+   distinct layers. A legacy `.notification-bell span` rule positioned both
+   spans as badges, which visually concealed the bell beneath the count. */
+.topbar { overflow: visible; }
+.topbar-actions {
+  min-width: 0;
+  flex: 1 1 auto;
+  align-content: center;
+}
+.topbar-actions > * { flex: 0 0 auto; }
+.notification-menu {
+  position: relative;
+  z-index: 45;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  overflow: visible;
+}
+.notification-bell {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  cursor: pointer;
+  overflow: visible;
+}
+.notification-bell .bell-icon {
+  position: static;
+  display: block;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.12rem;
+  line-height: 1;
+}
+.notification-bell .notif-badge {
+  position: absolute;
+  z-index: 2;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--panel, #07111d);
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: .62rem;
+  line-height: 1;
+}
+#themeToggle { flex: 0 0 auto; margin-left: 2px; }
+.notification-popover { z-index: 46; }
+
+@media (max-width: 1280px) {
+  .topbar { flex-wrap: wrap; }
+  .topbar-title { flex: 1 1 310px; }
+  .topbar-actions { flex: 1 1 500px; }
+}
+
+@media (max-width: 840px) {
+  .topbar-actions { flex-basis: 100%; width: 100%; justify-content: flex-start; }
+  .notification-menu, .notification-bell { flex-shrink: 0; }
+}
+
+@media (max-width: 560px) {
+  .topbar-actions { gap: 8px; }
+  .live-status, .sim-label { font-size: .62rem; padding-inline: 10px; }
+  .date-pill { display: none; }
+  .notification-menu { order: 1; }
+  #themeToggle { order: 2; }
+  .demo-btn { order: 3; }
+}
