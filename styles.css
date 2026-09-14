@@ -3690,3 +3690,65 @@ html[data-theme="light"] #loginScreen #passwordInput:-webkit-autofill:focus {
     border-radius: 0;
   }
 }
+
+/* Mobile command navigation: a dedicated off-canvas drawer, not a squeezed
+   desktop sidebar. Keeping it out of document flow prevents the dashboard
+   from starting below a long navigation list on phones and tablets. */
+.mobile-nav { display: none; }
+@media (max-width: 840px) {
+  .app-shell { display: block; min-height: 100dvh; overflow: visible; }
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 160;
+    width: min(318px, 88vw);
+    padding: 18px 14px 24px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+    box-shadow: 20px 0 48px rgba(0, 0, 0, 0.34);
+    transform: translateX(-105%);
+    transition: transform 280ms cubic-bezier(.2, .8, .2, 1);
+    will-change: transform;
+  }
+  body.nav-open .sidebar { transform: translateX(0); }
+  body.nav-open .app-shell::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: rgba(3, 10, 18, 0.42);
+    backdrop-filter: blur(2px);
+  }
+  .sidebar .menu { display: flex; grid-template-columns: none; gap: 5px; }
+  .sidebar-footer { margin-top: 16px; }
+  .main-panel { padding: 16px 14px 30px; }
+  .mobile-nav { display: inline-grid; place-items: center; flex: 0 0 auto; }
+  .topbar { gap: 14px; }
+  .topbar-actions { width: 100%; justify-content: flex-start; gap: 8px; }
+  .region-breadcrumb { max-width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .main-panel { padding-inline: 12px; }
+  .topbar h2 { font-size: 1.42rem; line-height: 1.12; }
+  .topbar-actions > * { min-height: 38px; }
+}
+
+/* Operational additions: compact filters, demo controls and the audit view. */
+.sensor-toolbar, .demo-controls, .audit-summary { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sensor-toolbar { margin: 16px 0 20px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(66,196,255,.035); }
+.sensor-toolbar label { display: grid; gap: 5px; color: var(--muted); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+.sensor-toolbar input, .sensor-toolbar select { min-height: 36px; min-width: 156px; }
+.demo-controls { margin-top: 10px; }
+.demo-controls .secondary-btn { min-height: 34px; padding: 0 12px; font-size: .7rem; }
+.audit-summary { margin: 16px 0; }
+.audit-stat { min-width: 150px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.audit-stat span { display: block; color: var(--muted); font: 600 .65rem var(--mono); letter-spacing: .1em; }
+.audit-stat strong { display: block; margin-top: 6px; font-size: 1.1rem; }
+.audit-log-list { display: grid; gap: 8px; }
+.audit-row { display: grid; grid-template-columns: 58px 100px 1fr; gap: 12px; align-items: start; padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.audit-row time, .audit-row span { color: var(--muted); font: 600 .7rem var(--mono); letter-spacing: .04em; }
+.audit-row p { margin: 5px 0 0; color: var(--muted); font-size: .82rem; }
+@media (max-width: 600px) { .sensor-toolbar > * { width: 100%; } .sensor-toolbar input, .sensor-toolbar select { width: 100%; } .audit-row { grid-template-columns: 1fr; gap: 4px; } }

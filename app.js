@@ -9,12 +9,13 @@ const OFFLINE_DEMO_AUTH = {
   email: 'demo@bhooshanket.ai',
   passcode: 'BhooShanketDemo2026!'
 };
-const VIEWS = ['dashboard', 'map', 'prediction', 'analytics', 'weather', 'sensors', 'alerts', 'communication', 'authority', 'rescue', 'citizen', 'route', 'zones', 'precautions', 'contacts', 'energy', 'settings'];
+const VIEWS = ['dashboard', 'map', 'prediction', 'analytics', 'weather', 'sensors', 'alerts', 'communication', 'authority', 'rescue', 'citizen', 'route', 'zones', 'precautions', 'contacts', 'energy', 'audit', 'settings'];
 const ENERGY_MODES = ['ACTIVE MONITORING', 'ENERGY SAVING', 'NIGHT MONITORING', 'AUTOMATIC ALERT PRIORITY'];
 const INCIDENT_FLOW = ['NEW', 'ACKNOWLEDGED', 'TEAM ASSIGNED', 'DISPATCHED', 'ON SCENE', 'RESOLVED'];
 
 const appState = {
   authenticated: false,
+  authUser: null,
   activeView: 'dashboard',
   lang: 'en',
   theme: localStorage.getItem(THEME_KEY) || 'dark',
@@ -24,7 +25,10 @@ const appState = {
   activeCorridor: 'safest',
   reroutingActive: false,
   reroutingStage: 0,
-  phaseIndex: 0,
+  // Open the command center in the live regional-risk posture. The Live Demo
+  // still intentionally begins from Phase 01 (normal conditions) and then
+  // tells the full escalation story.
+  phaseIndex: 2,
   demoRiskOverride: null,
   liveDemoRunning: false,
   selectedPeriod: '24H',
@@ -181,8 +185,8 @@ const metricTemplates = [
 const riskThresholds = {
   LOW: { min: 0, max: 30 },
   MEDIUM: { min: 31, max: 60 },
-  HIGH: { min: 61, max: 80 },
-  CRITICAL: { min: 81, max: 100 }
+  HIGH: { min: 61, max: 85 },
+  CRITICAL: { min: 86, max: 100 }
 };
 
 const phaseDefinitions = [
@@ -195,14 +199,14 @@ const phaseDefinitions = [
 function getEndRiskLabel(value) {
   if (value < 30) return 'LOW';
   if (value < 60) return 'MEDIUM';
-  if (value < 80) return 'HIGH';
+  if (value < 86) return 'HIGH';
   return 'CRITICAL';
 }
 
 function getRiskColor(value) {
   if (value < 30) return 'var(--green)';
   if (value < 60) return 'var(--yellow)';
-  if (value < 80) return 'var(--orange)';
+  if (value < 86) return 'var(--orange)';
   return 'var(--red)';
 }
 
@@ -232,33 +236,75 @@ function getLocalAccounts() {
 }
 
 function saveLocalAccounts(accounts) {
-  localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(accounts));
+  try {
+    localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(accounts));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function hasLocalAccount(email) {
   return Object.prototype.hasOwnProperty.call(getLocalAccounts(), email);
 }
 
-function isValidLogin(email, passcode) {
+function getLocalAccount(email) {
+  const account = getLocalAccounts()[email];
+  // Compatibility: earlier prototype builds stored email -> password strings.
+  if (typeof account === 'string') return { name: email.split('@')[0], email, passcode: account };
+  if (account && typeof account === 'object') {
+    const passcode = typeof account.passcode === 'string' ? account.passcode : account.password;
+    if (typeof passcode !== 'string') return null;
+    return { name: String(account.name || email.split('@')[0]).trim() || 'Authority', email, passcode };
+  }
+  return null;
+}
+
+function authenticateUser(email, passcode) {
   const config = getAuthConfig();
-  const accounts = getLocalAccounts();
-  return (Boolean(config.email && config.passcode) && email === config.email && passcode === config.passcode)
-    || (typeof accounts[email] === 'string' && passcode === accounts[email]);
+  if (Boolean(config.email && config.passcode) && email === config.email && passcode === config.passcode) {
+    return { name: 'Authority', email };
+  }
+  const account = getLocalAccount(email);
+  return account?.passcode === passcode ? { name: account.name, email: account.email } : null;
+}
+
+function getStoredAuthUser() {
+  const raw = sessionStorage.getItem(AUTH_KEY) || localStorage.getItem(AUTH_KEY);
+  if (!raw) return null;
+  // Compatibility with legacy "1" session values from previous deployments.
+  if (raw === '1') return { name: 'Authority', email: '' };
+  try {
+    const session = JSON.parse(raw);
+    return session && typeof session === 'object' && typeof session.name === 'string'
+      ? { name: session.name, email: String(session.email || '') }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function hasAuthSession() {
-  return sessionStorage.getItem(AUTH_KEY) === '1' || localStorage.getItem(AUTH_KEY) === '1';
+  return Boolean(getStoredAuthUser());
 }
 
-function persistAuth(remember) {
-  sessionStorage.setItem(AUTH_KEY, '1');
-  if (remember) localStorage.setItem(AUTH_KEY, '1');
-  else localStorage.removeItem(AUTH_KEY);
+function persistAuth(remember, user) {
+  const session = JSON.stringify({ name: user?.name || 'Authority', email: user?.email || '' });
+  try {
+    sessionStorage.setItem(AUTH_KEY, session);
+    if (remember) localStorage.setItem(AUTH_KEY, session);
+    else localStorage.removeItem(AUTH_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function clearAuth() {
-  sessionStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(AUTH_KEY);
+  try {
+    sessionStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(AUTH_KEY);
+  } catch {}
 }
 
 function applyTheme(theme) {
@@ -316,8 +362,8 @@ function explanationCopy(level) {
 }
 
 function recommendedAction(risk) {
-  if (risk >= 80) return 'Prepare evacuation and keep high-risk corridors closed.';
-  if (risk >= 60) return 'Escalate warning advisory and ready response teams.';
+  if (risk >= riskThresholds.CRITICAL.min) return 'Prepare evacuation and keep high-risk corridors closed.';
+  if (risk >= riskThresholds.HIGH.min) return 'Escalate warning advisory and ready response teams.';
   if (risk >= 31) return 'Increase patrol cadence and validate sensor health.';
   return 'Continue routine observation.';
 }
@@ -379,6 +425,7 @@ function setView(view) {
   });
   if (location.hash.replace('#', '') !== view) history.replaceState(null, '', `#${view}`);
   document.body.classList.remove('nav-open');
+  document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', 'false');
   if (view === 'analytics' || view === 'weather') renderCharts();
 }
 
@@ -395,17 +442,26 @@ function navigateTo(view, options = {}) {
 
 function showApp() {
   appState.authenticated = true;
+  appState.authUser = getStoredAuthUser() || appState.authUser || { name: 'Authority', email: '' };
   document.getElementById('bootOverlay')?.remove();
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appShell').classList.remove('hidden');
   setAssistantState(sessionStorage.getItem(ASSISTANT_STATE_KEY) || 'minimized');
   const hashView = location.hash.replace('#', '');
   setView(VIEWS.includes(hashView) ? hashView : 'dashboard');
+  const name = appState.authUser.name || 'Authority';
+  const greeting = document.getElementById('greetingLine');
+  if (greeting) greeting.textContent = `WELCOME BACK, ${name.toUpperCase()}`;
+  const profileName = document.querySelector('.profile-pill strong');
+  if (profileName) profileName.textContent = name;
+  const avatar = document.querySelector('.profile-pill .avatar');
+  if (avatar) avatar.textContent = name.slice(0, 1).toUpperCase();
   renderAll();
 }
 
 function showLogin() {
   appState.authenticated = false;
+  appState.authUser = null;
   if (appState.demoTimer) {
     clearInterval(appState.demoTimer);
     appState.demoTimer = null;
@@ -502,7 +558,9 @@ function riskScoreFromLocation(location) {
   if (appState.demoRiskOverride !== null) return appState.demoRiskOverride;
   const phase = phaseDefinitions[appState.phaseIndex] || phaseDefinitions[0];
   const base = location.risk * 0.6;
-  const offset = phase.risk * 0.7;
+  // Keep the intelligence model's regional baseline primary while allowing
+  // the shared live-demo phase to materially drive every connected module.
+  const offset = phase.risk * 0.48;
   const risk = Math.min(100, Math.max(12, Math.round(base + offset)));
   return risk;
 }
@@ -516,11 +574,11 @@ function updateClock() {
 function renderNotifications() {
   const selected = getSelectedLocation();
   const risk = riskScoreFromLocation(selected);
-  const severity = risk >= 80 ? 'critical' : risk >= 60 ? 'warning' : 'normal';
+  const severity = risk >= riskThresholds.CRITICAL.min ? 'critical' : risk >= riskThresholds.HIGH.min ? 'warning' : 'normal';
   const notifications = [
     `Risk in ${selected.name}: ${getEndRiskLabel(risk)}`,
     `${phaseDefinitions[appState.phaseIndex].label}`,
-    `Priority action: ${risk >= 80 ? 'Evacuation prep' : risk >= 60 ? 'Escalated monitoring' : 'Routine watch'}`,
+    `Priority action: ${risk >= riskThresholds.CRITICAL.min ? 'Evacuation prep' : risk >= riskThresholds.HIGH.min ? 'Escalated monitoring' : 'Routine watch'}`,
     `Sensor health: ${selected.sensorStatus === 'warning' ? 'Elevated' : 'Nominal'}`,
     `Telemetry: ${appState.telemetrySource}`
   ];
@@ -731,7 +789,7 @@ function renderRiskOverview() {
   document.getElementById('riskLevelText').textContent = `${level} RISK`;
   document.getElementById('rainfallFact').textContent = risk > 70 ? 'HIGH' : risk > 40 ? 'MODERATE' : 'LOW';
   document.getElementById('moistureFact').textContent = risk > 70 ? 'HIGH' : risk > 40 ? 'ELEVATED' : 'NORMAL';
-  document.getElementById('movementFact').textContent = risk > 80 ? 'CRITICAL' : risk > 60 ? 'ELEVATED' : 'STABLE';
+  document.getElementById('movementFact').textContent = risk >= riskThresholds.CRITICAL.min ? 'CRITICAL' : risk >= riskThresholds.HIGH.min ? 'ELEVATED' : 'STABLE';
   document.getElementById('conditionFact').textContent = selected.weather.toUpperCase();
   document.getElementById('aiInsight').textContent = explanationCopy(level);
   document.getElementById('riskMatterText').textContent = explanationCopy(level);
@@ -753,7 +811,7 @@ function renderRiskOverview() {
   gauge.dataset.level = level.toLowerCase();
   contributionMarkup('dashboardContributionBars');
   const status = document.getElementById('systemStatusLabel');
-  if (status) status.textContent = level === 'CRITICAL' ? 'CRITICAL WATCH' : level === 'HIGH' ? 'ELEVATED' : 'STABLE';
+  if (status) status.textContent = level === 'CRITICAL' ? 'CRITICAL WATCH' : level === 'HIGH' ? 'HIGH WATCH' : level === 'MEDIUM' ? 'ELEVATED' : 'STABLE';
   const mode = document.getElementById('systemModeLabel');
   if (mode) mode.textContent = appState.systemMode;
   renderLiveIncidents();
@@ -771,7 +829,7 @@ function renderWeather() {
     { label: 'Rainfall Intensity', value: `${selected.rainfall} mm/hr`, icon: '▣' },
     { label: '24-Hour Rainfall', value: `${phaseDefinitions[appState.phaseIndex].rainfall24} mm`, icon: '◍' },
     { label: '72-Hour Rainfall', value: `${phaseDefinitions[appState.phaseIndex].rainfall72} mm`, icon: '◒' },
-    { label: 'Weather Trend', value: risk > 80 ? 'Escalating' : risk > 50 ? 'Rising' : 'Stable', icon: '△' },
+    { label: 'Weather Trend', value: risk >= riskThresholds.CRITICAL.min ? 'Escalating' : risk >= riskThresholds.HIGH.min ? 'Rising' : 'Stable', icon: '△' },
     { label: 'Rainfall Forecast', value: risk > 70 ? 'High' : 'Moderate', icon: '☼' }
   ];
 
@@ -1513,7 +1571,7 @@ function renderMapInfoPanel() {
   const selected = getSelectedLocation();
   const risk = riskScoreFromLocation(selected);
   const level = getEndRiskLabel(risk);
-  const action = risk >= 80 ? 'Evacuation readiness & emergency corridors open' : risk >= 60 ? 'Escalate warning advisory & response standby' : 'Routine continuous observation';
+  const action = risk >= riskThresholds.CRITICAL.min ? 'Evacuation readiness & emergency corridors open' : risk >= riskThresholds.HIGH.min ? 'Escalate warning advisory & response standby' : 'Routine continuous observation';
   const panel = document.getElementById('mapInfoPanel');
   if (!panel) return;
 
@@ -2049,7 +2107,7 @@ function renderAssistant() {
   const risk = riskScoreFromLocation(selected);
   const level = getEndRiskLabel(risk);
   const confidence = Math.min(98, Math.round(72 + (selected.sensorStatus === 'warning' ? 12 : 8) + appState.phaseIndex * 3));
-  const action = risk >= 80 ? 'Prepare evacuation readiness' : risk >= 60 ? 'Escalate monitoring posture' : 'Continue routine observation';
+  const action = risk >= riskThresholds.CRITICAL.min ? 'Prepare evacuation readiness' : risk >= riskThresholds.HIGH.min ? 'Escalate monitoring posture' : 'Continue routine observation';
   document.getElementById('assistantContext').innerHTML = `
     <div><span>LIVE RISK</span><strong style="color:${getRiskColor(risk)}">${risk}% ${level}</strong></div>
     <div><span>CONFIDENCE</span><strong>${confidence}%</strong></div>
@@ -2082,7 +2140,7 @@ function answerAssistantQuery(query) {
 
   // 1. Current Risk
   if (normalized.includes('current risk') || (normalized.includes('risk') && !normalized.includes('why') && !normalized.includes('high'))) {
-    return `<strong>Current Landslide Probability for ${selected.name} (${selected.district}, ${selected.state}):</strong> <span style="color:${getRiskColor(risk)}">${risk}% [${level}]</span>.<br>Multi-factor breakdown: Rainfall Weight 35%, Soil Saturation 25%, Slope Vector Displacement 20%, Slope Gradient 10%, Weather System 10%. Operational posture: <em>${risk >= 80 ? 'Prepare immediate evacuation readiness.' : risk >= 60 ? 'Escalate monitoring posture.' : 'Maintain continuous observation.'}</em>`;
+    return `<strong>Current Landslide Probability for ${selected.name} (${selected.district}, ${selected.state}):</strong> <span style="color:${getRiskColor(risk)}">${risk}% [${level}]</span>.<br>Multi-factor breakdown: Rainfall Weight 35%, Soil Saturation 25%, Slope Vector Displacement 20%, Slope Gradient 10%, Weather System 10%. Operational posture: <em>${risk >= riskThresholds.CRITICAL.min ? 'Prepare immediate evacuation readiness.' : risk >= riskThresholds.HIGH.min ? 'Escalate monitoring posture.' : 'Maintain continuous observation.'}</em>`;
   }
 
   // 2. Why is the risk high?
@@ -2165,12 +2223,7 @@ function buildAlertMessage() {
 function initializeEvents() {
   const showDashboard = () => {
     appState.authenticated = true;
-    document.getElementById('bootOverlay')?.remove();
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('appShell').classList.remove('hidden');
-    setAssistantState('minimized');
-    appState.activeView = 'dashboard';
-    renderAll();
+    showApp();
   };
 
   const activateCommandNetwork = () => {
@@ -2195,7 +2248,8 @@ function initializeEvents() {
     event.preventDefault();
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const passcode = document.getElementById('passwordInput').value;
-    const valid = isValidLogin(email, passcode);
+    const user = authenticateUser(email, passcode);
+    const valid = Boolean(user);
     const error = document.getElementById('loginError');
     error.classList.toggle('hidden', valid);
     if (valid) {
@@ -2203,7 +2257,13 @@ function initializeEvents() {
       const submit = document.querySelector('.login-submit');
       if (status) { status.textContent = 'AUTHENTICATION VERIFIED'; status.classList.remove('hidden'); }
       if (submit) submit.disabled = true;
-      persistAuth(document.getElementById('rememberMe').checked);
+      if (!persistAuth(document.getElementById('rememberMe').checked, user)) {
+        error.textContent = 'Unable to save your session in this browser. Please allow browser storage and try again.';
+        error.classList.remove('hidden');
+        if (submit) submit.disabled = false;
+        return;
+      }
+      appState.authUser = user;
       activateCommandNetwork();
     } else {
       const status = document.getElementById('authStatus');
@@ -2230,7 +2290,7 @@ function initializeEvents() {
   };
   const closeSignup = () => {
     signupPanel?.classList.add('hidden');
-    ['signupEmail', 'signupPasscode', 'signupConfirmPasscode'].forEach(id => { document.getElementById(id).value = ''; });
+    ['signupName', 'signupEmail', 'signupPasscode', 'signupConfirmPasscode'].forEach(id => { document.getElementById(id).value = ''; });
     setSignupMessage('');
   };
   document.getElementById('createAccount')?.addEventListener('click', () => {
@@ -2241,20 +2301,31 @@ function initializeEvents() {
   });
   document.getElementById('closeSignup')?.addEventListener('click', closeSignup);
   document.getElementById('completeSignup')?.addEventListener('click', () => {
+    const button = document.getElementById('completeSignup');
+    if (button?.disabled) return;
+    button.disabled = true;
+    button.textContent = 'CREATING ACCOUNT...';
+    const finish = () => { if (button) { button.disabled = false; button.textContent = 'CREATE ACCOUNT'; } };
+    const name = document.getElementById('signupName').value.trim();
     const email = document.getElementById('signupEmail').value.trim().toLowerCase();
     const passcode = document.getElementById('signupPasscode').value;
     const confirmation = document.getElementById('signupConfirmPasscode').value;
-    if (!/^\S+@\S+\.\S+$/.test(email)) return setSignupMessage('Enter a valid email address.', 'error');
-    if (passcode.length < 8) return setSignupMessage('Use at least 8 characters for the password.', 'error');
-    if (passcode !== confirmation) return setSignupMessage('The passwords do not match.', 'error');
-    if (hasLocalAccount(email) || email === getAuthConfig().email) return setSignupMessage('An account already exists for this email. Please sign in.', 'error');
+    if (!name) { finish(); return setSignupMessage('Enter your name.', 'error'); }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { finish(); return setSignupMessage('Please enter a valid email address.', 'error'); }
+    if (passcode.length < 8) { finish(); return setSignupMessage('Use at least 8 characters for the password.', 'error'); }
+    if (passcode !== confirmation) { finish(); return setSignupMessage('Passwords do not match.', 'error'); }
+    if (hasLocalAccount(email) || email === getAuthConfig().email) { finish(); return setSignupMessage('An account with this email already exists.', 'error'); }
     const accounts = getLocalAccounts();
-    accounts[email] = passcode;
-    saveLocalAccounts(accounts);
-    document.getElementById('loginEmail').value = email;
-    document.getElementById('passwordInput').value = '';
-    closeSignup();
-    showToast('Account created. Sign in with your new password.', 'success');
+    accounts[email] = { name, email, passcode };
+    if (!saveLocalAccounts(accounts) || !persistAuth(true, { name, email })) {
+      finish();
+      return setSignupMessage('Something went wrong. Please try again.', 'error');
+    }
+    appState.authUser = { name, email };
+    finish();
+    setSignupMessage('Account created successfully.', 'success');
+    showToast(`Welcome back, ${name}`, 'success');
+    setTimeout(showDashboard, 250);
   });
 
   const recoveryPanel = document.getElementById('recoveryPanel');
@@ -2310,8 +2381,12 @@ function initializeEvents() {
     const recoveryEmail = document.getElementById('recoveryEmail').value.trim().toLowerCase();
     if (hasLocalAccount(recoveryEmail)) {
       const accounts = getLocalAccounts();
-      accounts[recoveryEmail] = newPasscode;
-      saveLocalAccounts(accounts);
+      const existing = getLocalAccount(recoveryEmail);
+      accounts[recoveryEmail] = { name: existing?.name || recoveryEmail.split('@')[0], email: recoveryEmail, passcode: newPasscode };
+      if (!saveLocalAccounts(accounts)) {
+        setRecoveryMessage('Something went wrong. Please try again.', 'error');
+        return;
+      }
     } else {
       sessionStorage.setItem(RECOVERY_PASSCODE_KEY, newPasscode);
     }
@@ -2621,7 +2696,16 @@ function initializeEvents() {
   document.querySelectorAll('#historyMetricToggles [data-history]').forEach(button => button.addEventListener('click', () => { appState.historyMetrics = [button.dataset.history]; renderCharts(); }));
   document.querySelectorAll('#precautionTabs [data-risk-tab]').forEach(button => button.addEventListener('click', () => { appState.precautionTab = button.dataset.riskTab; renderPrecautions(); }));
   document.querySelectorAll('.lang-btn').forEach(button => button.addEventListener('click', () => { appState.lang = button.dataset.lang; applyLanguage(); }));
-  document.getElementById('sidebarToggle')?.addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  document.getElementById('sidebarToggle')?.addEventListener('click', event => {
+    const open = document.body.classList.toggle('nav-open');
+    event.currentTarget.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !document.body.classList.contains('nav-open')) return;
+    document.body.classList.remove('nav-open');
+    document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', 'false');
+    document.getElementById('sidebarToggle')?.focus();
+  });
   document.getElementById('notificationBell')?.addEventListener('click', event => {
     event.stopPropagation();
     const popover = document.getElementById('notificationPopover');
@@ -2736,8 +2820,8 @@ function findSafestRoute() {
   const to = document.getElementById('routeTo')?.value || 'Umiam Safe Point';
   appState.selectedRoute = { from, to };
   const risk = riskScoreFromLocation(getSelectedLocation());
-  appState.routeRisk = risk >= 80 ? 'CRITICAL' : risk >= 60 ? 'HIGH' : 'LOW';
-  appState.routeStatus = risk >= 80 ? 'ALTERNATIVE REQUIRED' : risk >= 60 ? 'RISKY' : 'SAFE';
+  appState.routeRisk = risk >= riskThresholds.CRITICAL.min ? 'CRITICAL' : risk >= riskThresholds.HIGH.min ? 'HIGH' : 'LOW';
+  appState.routeStatus = risk >= riskThresholds.CRITICAL.min ? 'ALTERNATIVE REQUIRED' : risk >= riskThresholds.HIGH.min ? 'RISKY' : 'SAFE';
   renderRoute();
   showToast(appState.routeStatus === 'SAFE' ? 'Low-risk route identified' : 'Route risk updated; safer corridor recommended', appState.routeStatus === 'SAFE' ? 'success' : 'warning');
 }
@@ -2930,4 +3014,17 @@ function init() {
   setInterval(syncExternalTelemetry, 8000);
 }
 
+export {
+  appState, locationCatalog, sensorCatalog, alertBank, incidentTableData,
+  rescueTeams, safeZoneData, emergencyContacts, navigateTo, renderAll,
+  renderCommandLog, showToast, logCommand, getSelectedLocation,
+  riskScoreFromLocation, getEndRiskLabel
+};
+
 init();
+
+// Optional command-center enhancements are kept separate so the operational
+// dashboard remains usable even if a future deployment omits this module.
+import('./command-center-upgrade.js').then(({ installCommandCenterUpgrade }) => {
+  installCommandCenterUpgrade();
+}).catch(() => {});
