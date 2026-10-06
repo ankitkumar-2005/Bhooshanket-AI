@@ -128,6 +128,7 @@ function resetDemo() {
   appState.phaseIndex = 0;
   appState.selectedLocationId = 2;
   appState.selectedSensorId = null;
+  appState.selectedIncidentId = null;
   appState.mapMode = 'manual';
   appState.mapZoom = 1;
   appState.mapPanX = 0;

@@ -51,7 +51,9 @@ const appState = {
   displayedRisk: 0,
   citizenStatus: '',
   citizenWarning: '',
+  latestEmergencyRequest: null,
   selectedSensorId: null,
+  selectedIncidentId: null,
   selectedRoute: { from: '', to: 'Umiam Safe Point' },
   commLog: [],
   demoTimer: null,
@@ -188,10 +190,10 @@ const energyModes = ENERGY_MODES.map((label, index) => ({
 }));
 
 const metricTemplates = [
-  { label: 'ACTIVE DEMO ALERTS', value: 0, icon: '⚑', color: '#ff586f', trend: 'SIMULATED', goto: 'alerts' },
-  { label: 'ELEVATED-RISK ZONES', value: 0, icon: '◇', color: '#ff9c4a', trend: 'OF 8 DEMO ZONES', goto: 'map' },
-  { label: 'SENSOR RECORDS', value: 0, icon: '▣', color: '#68b8ff', trend: 'SIMULATED', goto: 'sensors' },
-  { label: 'SAFE ZONE RECORDS', value: 0, icon: '⌂', color: '#39dd9d', trend: 'DEMO INVENTORY', goto: 'zones' }
+  { label: 'ACTIVE ALERTS', value: 0, icon: '⚑', color: '#ff586f', detail: 'Unresolved', goto: 'alerts' },
+  { label: 'HIGH-RISK ZONES', value: 0, icon: '◇', color: '#ff9c4a', detail: 'Across 8 zones', goto: 'map' },
+  { label: 'SENSOR RECORDS', value: 0, icon: '▣', color: '#68b8ff', detail: 'In the catalog', goto: 'sensors' },
+  { label: 'SAFE ZONE RECORDS', value: 0, icon: '⌂', color: '#39dd9d', detail: 'In the register', goto: 'zones' }
 ];
 
 const riskThresholds = {
@@ -343,6 +345,12 @@ function showToast(message, tone = 'info') {
   setTimeout(() => el.remove(), 4200);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
 function logCommand(type, title, detail, tone = 'blue') {
   appState.commandEvents.unshift({ time: nowStamp(), type, title, detail, tone });
 }
@@ -351,26 +359,10 @@ function aiConfidence() {
   return 'PROTOTYPE';
 }
 
-function getFactorContributions() {
-  const model = appState.aiModel;
-  const raw = [
-    { label: 'Rainfall', value: (model.rainfallIntensity / 100) * 35 },
-    { label: 'Soil Moisture', value: (model.soilMoisture / 100) * 25 },
-    { label: 'Slope Movement', value: (model.slopeMovement / 100) * 20 },
-    { label: 'Slope Angle', value: (model.slopeAngle / 60) * 10 },
-    { label: 'Weather Condition', value: model.weatherCondition === 'clear' ? 4 : 10 }
-  ];
-  const total = raw.reduce((sum, item) => sum + item.value, 0) || 1;
-  return raw.map(item => ({ ...item, pct: Math.max(4, Math.round((item.value / total) * 100)) }));
-}
-
 function explanationCopy(level) {
   const selected = getSelectedLocation();
-  const inputs = `rainfall ${selected.rainfall} mm/hr, soil moisture ${selected.soilMoisture}%, and slope movement ${selected.slopeMovement} mm`;
-  if (level === 'CRITICAL') return `The prototype weighted risk score is critical for ${selected.name}, based on demo inputs including ${inputs}. This illustrative score is not a verified forecast or public warning.`;
-  if (level === 'HIGH') return `The prototype weighted risk score is elevated for ${selected.name}, based on demo inputs including ${inputs}. Use official local guidance for real-world decisions.`;
-  if (level === 'MEDIUM') return `The prototype weighted risk score is moderate for ${selected.name}. Demo inputs include ${inputs}; this is an illustrative model output.`;
-  return `The prototype weighted risk score is low for ${selected.name}. The environmental values are simulated and do not establish that a location is safe.`;
+  const phase = phaseDefinitions[appState.phaseIndex] || phaseDefinitions[0];
+  return `The prototype weighted score is ${level.toLowerCase()} for ${selected.name}. It combines the stored demo-zone baseline with the selected scenario phase (${phase.label.replace(/^Phase \d+ — /, '')}). The environmental readings are context; this score is not a verified forecast or public warning.`;
 }
 
 function recommendedAction(risk) {
@@ -425,13 +417,21 @@ function countTo(element, next, suffix = '') {
 
 function resetRouteScrollPosition() {
   // The command center uses document/window scrolling (not a separate panel).
-  // Reset both targets so a prior long screen never leaks into a new route.
+  // Disable scroll anchoring during the switch: hiding the longer landing
+  // screen can otherwise preserve its old offset when the dashboard appears.
   const root = document.scrollingElement;
+  const previousScrollBehavior = document.documentElement.style.scrollBehavior;
+  document.documentElement.style.scrollBehavior = 'auto';
+  document.documentElement.style.overflowAnchor = 'none';
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   if (root) { root.scrollTop = 0; root.scrollLeft = 0; }
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     if (root) { root.scrollTop = 0; root.scrollLeft = 0; }
+    window.setTimeout(() => {
+      document.documentElement.style.scrollBehavior = previousScrollBehavior;
+      document.documentElement.style.overflowAnchor = '';
+    }, 180);
   });
 }
 
@@ -484,7 +484,9 @@ function showApp() {
   document.body.classList.add('app-authenticated');
   appState.authUser = getStoredAuthUser() || appState.authUser || { name: 'Authority', email: '' };
   document.getElementById('bootOverlay')?.remove();
-  document.getElementById('loginScreen').classList.add('hidden');
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.scrollTop = 0;
+  loginScreen?.classList.add('hidden');
   document.getElementById('appShell').classList.remove('hidden');
   setAssistantState(sessionStorage.getItem(ASSISTANT_STATE_KEY) || 'minimized');
   const hashView = location.hash.replace('#', '');
@@ -497,6 +499,7 @@ function showApp() {
   const avatar = document.querySelector('.profile-pill .avatar');
   if (avatar) avatar.textContent = name.slice(0, 1).toUpperCase();
   renderAll();
+  resetRouteScrollPosition();
 }
 
 function showLogin() {
@@ -628,18 +631,6 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.add('hidden');
 }
 
-function contributionMarkup(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  el.innerHTML = getFactorContributions().map(item => `
-    <div class="bar-row">
-      <span>${item.label}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${item.pct}%;"></div></div>
-      <strong>${item.pct}%</strong>
-    </div>
-  `).join('');
-}
-
 function applyLanguage() {
   const hindi = appState.lang === 'hi';
   document.documentElement.lang = hindi ? 'hi' : 'en';
@@ -745,7 +736,7 @@ function renderCommandLog() {
     <div class="command-event ${event.tone}">
       <div class="event-marker"></div>
       <div class="event-time">${event.time}</div>
-      <div class="event-copy"><span>${event.type}</span><strong>${event.title}</strong><p>${event.detail}</p></div>
+      <div class="event-copy"><span>${escapeHtml(event.type)}</span><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.detail)}</p></div>
     </div>
   `).join('');
 }
@@ -761,18 +752,13 @@ function renderMetrics() {
   ];
 
   document.getElementById('metricsGrid').innerHTML = metrics.map(metric => `
-    <button type="button" class="metric-card interactive" data-goto="${metric.goto}">
-      <div class="top">
-        <div class="icon" style="background: ${metric.color}22; color: ${metric.color};">${metric.icon}</div>
-        <div class="trend" style="color: ${metric.color};">${metric.trend}</div>
-      </div>
-      <h4>${metric.label}</h4>
-      <div class="value" data-metric-value="${metric.value}" data-metric-suffix="${metric.unit || ''}" style="color: ${metric.color};">0${metric.unit || ''}</div>
-      <div class="sparkline">
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none">
-          <path d="M0 30 L18 26 L36 24 L52 16 L70 18 L86 8 L100 10" stroke="${metric.color}" fill="none" stroke-width="2.2" stroke-linecap="round" />
-        </svg>
-      </div>
+    <button type="button" class="metric-card command-metric interactive" data-goto="${metric.goto}" aria-label="${metric.label}; open ${metric.goto}">
+      <span class="command-metric-icon" aria-hidden="true" style="--metric-color:${metric.color}">${metric.icon}</span>
+      <span class="command-metric-copy">
+        <span class="command-metric-label">${metric.label}</span>
+        <strong class="value" data-metric-value="${metric.value}" data-metric-suffix="${metric.unit || ''}" style="--metric-color:${metric.color}">0${metric.unit || ''}</strong>
+        <small>${metric.detail}</small>
+      </span>
     </button>
   `).join('');
   document.querySelectorAll('[data-metric-value]').forEach(element => {
@@ -833,48 +819,44 @@ function renderLocationSelectors() {
   if (headerZone) headerZone.textContent = selected.name.replace(' Monitoring Zone', ' ZONE').toUpperCase();
 }
 
-function renderLiveIncidents() {
-  const feed = document.getElementById('liveIncidentFeed');
-  if (!feed) return;
-  const selected = getSelectedLocation();
-  const incidents = incidentTableData
-    .filter(incident => incident.location === selected.name)
+function renderDashboardAlerts() {
+  const list = document.getElementById('dashboardAlerts');
+  if (!list) return;
+  const activeAlerts = alertBank
+    .filter(alert => !['resolved', 'acknowledged'].includes(String(alert.status).toLowerCase()))
+    .sort((a, b) => Number.parseInt(b.probability, 10) - Number.parseInt(a.probability, 10))
     .slice(0, 3);
-  const fallback = appState.commandEvents.slice(0, 3).map(event => ({
-    title: event.title,
-    detail: event.detail,
-    status: event.type,
-    time: event.time,
-    risk: event.tone
-  }));
-  const items = incidents.length ? incidents.map(incident => ({
-    title: incident.id,
-    detail: `${incident.team} • ETA ${incident.eta}`,
-    status: incident.status,
-    time: incident.lastUpdated,
-    risk: incident.risk
-  })) : fallback;
-  feed.innerHTML = items.map(item => `
-    <div class="incident-row">
-      <strong>${item.title}</strong>
-      <span>${item.detail}</span>
-      <span class="tag ${String(item.risk).toLowerCase()}">${item.status}</span>
-      <small>${item.time}</small>
-    </div>
-  `).join('');
+  list.innerHTML = activeAlerts.length ? activeAlerts.map(alert => `
+    <article class="dashboard-alert-item">
+      <span class="tag ${alert.riskLevel.toLowerCase()}">${alert.riskLevel}</span>
+      <div class="dashboard-alert-copy">
+        <strong>${escapeHtml(alert.location)}</strong>
+        <small>${alert.factors.slice(0, 2).join(' · ')}</small>
+      </div>
+      <strong class="dashboard-alert-score">${alert.probability}<small>score</small></strong>
+      <button type="button" class="action-btn" data-alert-action="view" data-alert-id="${alert.id}" aria-label="View alert ${alert.id} for ${alert.location}">VIEW</button>
+    </article>
+  `).join('') : '<div class="dashboard-empty-state"><strong>No active alerts</strong><span>Monitoring is active. New demo alerts appear here when sample thresholds are crossed.</span></div>';
 }
 
-function renderTelemetry() {
-  const grid = document.getElementById('telemetryGrid');
-  if (!grid) return;
-  const selected = getSelectedLocation();
-  const sensors = sensorCatalog.filter(sensor => sensor.location === selected.name).slice(0, 4);
-  grid.innerHTML = sensors.map(sensor => `
-    <div class="intel-row">
-      <span>${sensor.name}</span>
-      <strong>${sensor.reading}${sensor.unit} <small>${sensor.status.toUpperCase()}</small></strong>
-    </div>
-  `).join('');
+function renderDashboardZones() {
+  const list = document.getElementById('dashboardZones');
+  if (!list) return;
+  const zones = [...locationCatalog]
+    .sort((a, b) => riskScoreFromLocation(b) - riskScoreFromLocation(a))
+    .slice(0, 3);
+  list.innerHTML = zones.map(location => {
+    const risk = riskScoreFromLocation(location);
+    const level = getEndRiskLabel(risk);
+    return `
+      <button type="button" class="dashboard-zone-item" data-open-map-zone="${location.id}" aria-label="Open ${location.name} in the risk map, ${level} risk, ${risk} percent">
+        <span class="dashboard-zone-mark ${level.toLowerCase()}" aria-hidden="true">${level === 'CRITICAL' ? '!' : '◇'}</span>
+        <span class="dashboard-zone-copy"><strong>${location.name}</strong><small>${location.district}, ${location.state}</small></span>
+        <span class="dashboard-zone-risk ${level.toLowerCase()}"><strong>${risk}%</strong><small>${level}</small></span>
+        <span class="dashboard-zone-arrow" aria-hidden="true">›</span>
+      </button>
+    `;
+  }).join('');
 }
 
 function renderDashboardOps() {
@@ -910,9 +892,9 @@ function renderRiskOverview() {
   document.getElementById('selectedLocationName').textContent = selected.name;
   countTo(document.getElementById('riskPercent'), risk, '%');
   document.getElementById('riskLevelText').textContent = `${level} RISK`;
-  document.getElementById('rainfallFact').textContent = risk > 70 ? 'HIGH' : risk > 40 ? 'MODERATE' : 'LOW';
-  document.getElementById('moistureFact').textContent = risk > 70 ? 'HIGH' : risk > 40 ? 'ELEVATED' : 'NORMAL';
-  document.getElementById('movementFact').textContent = risk >= riskThresholds.CRITICAL.min ? 'CRITICAL' : risk >= riskThresholds.HIGH.min ? 'ELEVATED' : 'STABLE';
+  document.getElementById('rainfallFact').textContent = `${selected.rainfall} mm/hr`;
+  document.getElementById('moistureFact').textContent = `${selected.soilMoisture}%`;
+  document.getElementById('movementFact').textContent = `${selected.slopeMovement} mm`;
   document.getElementById('conditionFact').textContent = selected.weather.toUpperCase();
   document.getElementById('aiInsight').textContent = explanationCopy(level);
   document.getElementById('riskMatterText').textContent = explanationCopy(level);
@@ -922,24 +904,20 @@ function renderRiskOverview() {
   if (regionEl) regionEl.textContent = `${selected.state} • ${selected.district}`;
   const ts = document.getElementById('riskTimestamp');
   if (ts) ts.textContent = nowStamp() + ' IST';
-  const trend = document.getElementById('riskMiniTrend');
-  if (trend) {
-    const pts = [18, 28, 36, 48, 62, risk].map((v, i) => `${i * 20},${36 - (v / 100) * 32}`).join(' ');
-    trend.innerHTML = `<polyline points="${pts}" fill="none" stroke="${riskColor}" stroke-width="2.2" />`;
-  }
+  const riskValue = document.getElementById('riskPercent');
+  if (riskValue) riskValue.setAttribute('aria-label', `${level} risk, ${risk} percent`);
 
   const gauge = document.getElementById('riskGauge');
   gauge.style.setProperty('--risk-progress', `${risk}%`);
   gauge.style.setProperty('--risk-color', riskColor);
   gauge.dataset.level = level.toLowerCase();
-  contributionMarkup('dashboardContributionBars');
   const status = document.getElementById('systemStatusLabel');
   if (status) status.textContent = level === 'CRITICAL' ? 'CRITICAL WATCH' : level === 'HIGH' ? 'HIGH WATCH' : level === 'MEDIUM' ? 'ELEVATED' : 'STABLE';
   const mode = document.getElementById('systemModeLabel');
   if (mode) mode.textContent = appState.systemMode;
-  renderLiveIncidents();
-  renderTelemetry();
   renderDashboardOps();
+  renderDashboardAlerts();
+  renderDashboardZones();
 }
 
 function renderWeather() {
@@ -1021,7 +999,7 @@ function renderAlerts() {
         </div>
         <div>
           <div class="small-label">Location</div>
-          <strong>${alert.location}</strong>
+          <strong>${escapeHtml(alert.location)}</strong>
         </div>
         <div>
           <div class="small-label">District</div>
@@ -1052,11 +1030,16 @@ function renderAlerts() {
 }
 
 function renderIncidentTable() {
-  document.getElementById('incidentTable').innerHTML = incidentTableData.map(item => `
+  document.getElementById('incidentTable').innerHTML = incidentTableData.map(item => {
+    const currentStep = Math.max(0, INCIDENT_FLOW.indexOf(item.status));
+    const nextStep = INCIDENT_FLOW[Math.min(INCIDENT_FLOW.length - 1, currentStep + 1)];
+    const resolved = item.status === 'RESOLVED';
+    return `
     <div class="incident-row">
+      <div><div class="small-label">Incident</div><strong>${item.id}</strong></div>
       <div>
         <div class="small-label">Location</div>
-        <strong>${item.location}</strong>
+        <strong>${escapeHtml(item.location)}</strong>
       </div>
       <div>
         <div class="small-label">Risk</div>
@@ -1082,11 +1065,16 @@ function renderIncidentTable() {
         <div class="small-label">Last Updated</div>
         <strong>${item.lastUpdated}</strong>
       </div>
+      <div>
+        <div class="small-label">ETA</div>
+        <strong>${item.eta}</strong>
+      </div>
       <div class="alert-actions">
-        <button class="action-btn" data-incident-action="advance" data-incident-id="${item.id}">ADVANCE</button>
+        <button class="action-btn" data-incident-action="advance" data-incident-id="${item.id}" ${resolved ? 'disabled' : ''}>${resolved ? 'RESOLVED' : `ADVANCE TO ${nextStep}`}</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderRescue() {
@@ -1120,10 +1108,26 @@ function renderRescue() {
 function renderCitizen() {
   const response = document.getElementById('citizenResponse');
   if (!response) return;
+  const request = appState.latestEmergencyRequest;
+  const linkedIncident = request && incidentTableData.find(item => item.id === request.incidentId);
+  const incidentStep = linkedIncident ? INCIDENT_FLOW.indexOf(linkedIncident.status) : -1;
   response.innerHTML = `
     <div>
       <strong>Current status:</strong> ${appState.citizenStatus || 'Awaiting citizen update.'}
     </div>
+    ${request ? `<div class="citizen-request-status" aria-live="polite">
+      <div class="eyebrow">DEMO REQUEST · ${request.id}</div>
+      <div class="intel-row"><span>Emergency</span><strong>${escapeHtml(request.type)}</strong></div>
+      <div class="intel-row"><span>Reported location</span><strong>${escapeHtml(request.location)}</strong></div>
+      <ol class="request-steps" aria-label="Emergency request progress">
+        <li class="complete">Request recorded</li>
+        <li class="${incidentStep >= 1 ? 'complete' : 'current'}">Authority triage${linkedIncident ? ` · ${linkedIncident.status}` : ''}</li>
+        <li class="${incidentStep >= 2 ? 'complete' : ''}">Team assignment${linkedIncident?.team && linkedIncident.team !== 'Unassigned' ? ` · ${linkedIncident.team}` : ' · pending'}</li>
+        <li class="${incidentStep >= 3 ? 'complete' : ''}">Dispatch${incidentStep >= 3 ? ` · ETA ${linkedIncident.eta}` : ' · pending'}</li>
+      </ol>
+      <p class="auth-note">Local simulation only. No emergency service receives this request. Use the authority workflow to advance this demo incident.</p>
+      <button type="button" class="action-btn" data-goto="authority">VIEW LINKED INCIDENT</button>
+    </div>` : ''}
     ${appState.citizenWarning ? `<div class="citizen-warning"><strong>CRITICAL CITIZEN WARNING</strong><span>${appState.citizenWarning}</span></div>` : ''}
   `;
 }
@@ -1329,7 +1333,8 @@ function renderRoute() {
     <div class="route-summary">
       <h4>PROTOTYPE ROUTE SIMULATION</h4>
       <p><strong>Active Corridor:</strong> ${corridor.name}</p>
-      <p>This illustrative route comparison uses the prototype's prefilled corridor scores. It does not use verified road conditions, live radar, or turn-by-turn navigation.</p>
+      <p><strong>${from}</strong> → <strong>${to}</strong></p>
+      <p>The recommendation prioritizes the stored sample risk score: the 5.8 km demo bypass is rated LOW (18%), while the shorter 4.2 km direct corridor is CRITICAL (88%). These are prefilled prototype values, not verified road conditions, live radar, or turn-by-turn navigation.</p>
       
       <h5 style="margin: 14px 0 8px; font-size: 0.76rem; letter-spacing: 0.1em; color: var(--muted);">CORRIDOR CHECKPOINTS &amp; GROUND CONDITIONS</h5>
       <div style="display: grid; gap: 6px;">
@@ -1513,15 +1518,23 @@ function renderMap() {
   }).join('') : '';
 
   // Active Incidents and Rescue vectors
-  const incidentsSvg = showIncidents ? incidentTableData.slice(0, 3).map((inc, i) => {
+  const visibleIncidents = incidentTableData.slice(0, 3).filter(incident =>
+    filteredLocations.some(location => location.name === incident.location)
+  );
+  const incidentsSvg = showIncidents ? visibleIncidents.map((inc, i) => {
     const loc = locationCatalog.find(l => l.name === inc.location) || locationCatalog[i];
     return `
-      <g class="incident-marker-group">
+      <g class="incident-marker-group" pointer-events="none">
         <circle cx="${loc.mapX}%" cy="${loc.mapY}%" r="16" fill="rgba(224, 49, 49, 0.25)" stroke="var(--red)" stroke-width="2" class="map-risk-halo" />
-        <rect x="calc(${loc.mapX}% - 34px)" y="calc(${loc.mapY}% - 34px)" width="68" height="18" rx="4" fill="#140608" stroke="var(--red)" stroke-width="1" />
-        <text x="${loc.mapX}%" y="calc(${loc.mapY}% - 22px)" fill="#ffd4d9" font-size="9" font-family="'IBM Plex Mono', monospace" text-anchor="middle" font-weight="700">${inc.id} • ${inc.status}</text>
       </g>
     `;
+  }).join('') : '';
+
+  const incidentMarkersHtml = showIncidents ? visibleIncidents.map((incident, index) => {
+    const location = locationCatalog.find(item => item.name === incident.location) || locationCatalog[index];
+    if (!location) return '';
+    const selectedIncident = appState.selectedIncidentId === incident.id;
+    return `<button type="button" class="incident-map-marker${selectedIncident ? ' selected' : ''}" data-incident-id="${incident.id}" style="left:${location.mapX}%;top:${location.mapY}%" aria-label="Select simulated incident ${incident.id}, ${incident.risk} severity, ${location.name}" aria-pressed="${selectedIncident}"><span aria-hidden="true">!</span><strong>${incident.id}</strong></button>`;
   }).join('') : '';
 
   // Map markers
@@ -1580,12 +1593,17 @@ function renderMap() {
 
     <div class="map-badge">${selected.state.toUpperCase()} <i>›</i> ${selected.district.toUpperCase()}</div>
 
-    <div class="map-legend">
-      <span><i class="legend-dot risk"></i>Prototype score</span>
-      <span><i class="legend-dot route"></i>Illustrative route</span>
-      ${showSensors ? '<span><i class="legend-dot" style="background:var(--blue);"></i>Sensor records</span>' : ''}
-      ${showSafe ? '<span><i class="legend-dot safe"></i>Safe-zone records</span>' : ''}
-      ${showTeams ? '<span><i class="legend-dot" style="background:var(--blue);"></i>Simulated teams</span>' : ''}
+    <div class="map-legend" role="group" aria-label="Map legend">
+      <span><i class="legend-dot low"></i>Low</span>
+      <span><i class="legend-dot medium"></i>Medium</span>
+      <span><i class="legend-dot high"></i>High</span>
+      <span><i class="legend-dot critical"></i>Critical</span>
+      <span><i class="legend-symbol route"></i>Illustrative route</span>
+      ${showIncidents ? '<span><i class="legend-symbol incident">!</i>Simulated incident</span>' : ''}
+      ${showSensors ? '<span><i class="legend-symbol sensor">⌁</i>Sensor record</span>' : ''}
+      ${showRainfall || showFloodContext ? '<span><i class="legend-symbol weather">●</i>Rainfall input</span>' : ''}
+      ${showSafe ? '<span><i class="legend-symbol safe">⌂</i>Safe-zone record</span>' : ''}
+      ${showTeams ? '<span><i class="legend-symbol team">R</i>Simulated team</span>' : ''}
     </div>
 
     ${showFloodContext ? '<div class="map-layer-note">RAINFALL CONTEXT ONLY · NOT A FLOOD FORECAST</div>' : ''}
@@ -1661,6 +1679,7 @@ function renderMap() {
       <!-- Active Marker Overlay -->
       ${markersHtml}
       ${sensorMarkersHtml}
+      ${incidentMarkersHtml}
     </div>
 
     <!-- Floating HUD Hover Tooltip -->
@@ -1706,11 +1725,27 @@ function renderMap() {
 
     wrapper.addEventListener('click', () => {
       appState.selectedSensorId = null;
+      appState.selectedIncidentId = null;
       appState.selectedLocationId = loc.id;
       appState.demoRiskOverride = null;
       syncAiModelFromLocation(loc);
       renderAll();
+      requestAnimationFrame(() => focusMapOnLocation(loc));
       showToast(`Selected monitoring zone: ${loc.name}`, 'info');
+    });
+  });
+  mapViewport.querySelectorAll('[data-incident-id]').forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      const incident = incidentTableData.find(item => item.id === button.dataset.incidentId);
+      const location = locationCatalog.find(item => item.name === incident?.location);
+      if (!incident || !location) return;
+      appState.selectedSensorId = null;
+      appState.selectedIncidentId = incident.id;
+      appState.selectedLocationId = location.id;
+      appState.mapZoom = 1.45;
+      renderAll();
+      requestAnimationFrame(() => focusMapOnLocation(location));
     });
   });
   mapViewport.querySelectorAll('[data-sensor-id]').forEach(button => {
@@ -1722,6 +1757,7 @@ function renderMap() {
         marker.setAttribute('aria-pressed', String(active));
       });
       appState.selectedSensorId = button.dataset.sensorId;
+      appState.selectedIncidentId = null;
       const sensor = sensorCatalog.find(item => item.id === appState.selectedSensorId);
       const location = locationCatalog.find(item => item.name === sensor?.location);
       if (location) appState.selectedLocationId = location.id;
@@ -1848,6 +1884,26 @@ function renderMapInfoPanel() {
     return;
   }
 
+  const selectedIncident = incidentTableData.find(incident => incident.id === appState.selectedIncidentId);
+  if (selectedIncident) {
+    panel.innerHTML = `
+      <div class="eyebrow">SIMULATED INCIDENT</div>
+      <h4>${selectedIncident.id}</h4>
+      <div class="intel-row"><span>Zone</span><strong>${escapeHtml(selectedIncident.location)}</strong></div>
+      <div class="intel-row"><span>Severity</span><strong class="tag ${selectedIncident.risk.toLowerCase()}">${selectedIncident.risk}</strong></div>
+      <div class="intel-row"><span>Response status</span><strong>${selectedIncident.status}</strong></div>
+      <div class="intel-row"><span>Assigned team</span><strong>${selectedIncident.team}</strong></div>
+      <div class="intel-row"><span>Estimated arrival</span><strong>${selectedIncident.eta}</strong></div>
+      <p class="auth-note">This incident is a local demo record. No response team is dispatched by this interface.</p>
+      <div class="map-panel-actions">
+        <button type="button" class="action-btn wide" data-goto="prediction">VIEW RISK EXPLANATION</button>
+        <button type="button" class="action-btn wide" data-goto="route">COMPARE SAFE ROUTES</button>
+        <button type="button" class="action-btn wide" data-goto="alerts">OPEN ALERT CENTER</button>
+      </div>
+    `;
+    return;
+  }
+
   panel.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
       <h4 style="margin: 0;">${selected.name}</h4>
@@ -1902,47 +1958,36 @@ function renderAiModel() {
   document.getElementById('aiRiskLabel').textContent = `${level} RISK`;
   document.getElementById('aiRiskLabel').style.color = getRiskColor(probability);
 
-  const forecastSteps = [
-    { label: 'Now', value: probability },
-    { label: '+6 hrs', value: Math.min(100, probability + (probability > 60 ? 7 : 4)) },
-    { label: '+12 hrs', value: Math.min(100, probability + (probability > 60 ? 12 : 7)) },
-    { label: '+24 hrs', value: Math.min(100, probability + (probability > 60 ? 16 : 10)) }
+  const weatherPoints = model.weatherCondition === 'heavyRain' ? 10 : model.weatherCondition === 'storm' ? 9 : model.weatherCondition === 'cloudburst' ? 10 : 4;
+  const contributors = [
+    { label: 'Rainfall intensity', points: (model.rainfallIntensity / 100) * 35, max: 35 },
+    { label: 'Soil moisture', points: (model.soilMoisture / 100) * 25, max: 25 },
+    { label: 'Slope movement', points: (model.slopeMovement / 100) * 20, max: 20 },
+    { label: 'Slope angle', points: (model.slopeAngle / 60) * 10, max: 10 },
+    { label: 'Weather condition', points: weatherPoints, max: 10 }
   ];
-  document.getElementById('forecastStrip').innerHTML = forecastSteps.map(step => `
-    <div class="forecast-step">
-      <span>${step.label}</span>
-      <strong style="color:${getRiskColor(step.value)}">${step.value}%</strong>
-      <small>${getEndRiskLabel(step.value)}</small>
+  const totalPoints = contributors.reduce((sum, item) => sum + item.points, 0);
+  document.getElementById('modelNote').innerHTML = `
+    <strong>Demo calculation · ${totalPoints.toFixed(1)} raw points → ${probability}% displayed score</strong>
+    <span>Rainfall over 24/72 hours, temperature and humidity are shown as context only; this prototype formula does not use them. This interactive score is separate from the command-center regional score.</span>
+  `;
+
+  document.getElementById('riskContributionBars').innerHTML = contributors.map(item => `
+    <div class="bar-row">
+      <span>${item.label}</span>
+      <div class="bar-track" role="img" aria-label="${item.label}: ${item.points.toFixed(1)} of ${item.max} score points"><div class="bar-fill" style="width:${Math.min(100, (item.points / item.max) * 100)}%;"></div></div>
+      <strong>${item.points.toFixed(1)} / ${item.max}</strong>
     </div>
   `).join('');
 
-  const contributors = [
-    { label: 'Rainfall', value: 35 },
-    { label: 'Soil Moisture', value: 25 },
-    { label: 'Slope Movement', value: 20 },
-    { label: 'Slope Angle', value: 10 },
-    { label: 'Weather Condition', value: 10 }
+  const inputValues = [
+    `Rainfall intensity: ${model.rainfallIntensity}/100 input · ${contributors[0].points.toFixed(1)} of 35 score points.`,
+    `Soil moisture: ${model.soilMoisture}/100 input · ${contributors[1].points.toFixed(1)} of 25 score points.`,
+    `Slope movement: ${model.slopeMovement}/100 input · ${contributors[2].points.toFixed(1)} of 20 score points.`,
+    `Slope angle: ${model.slopeAngle}° input · ${contributors[3].points.toFixed(1)} of 10 score points.`,
+    `Weather category (${model.weatherCondition}): ${weatherPoints} of 10 score points.`
   ];
-
-  const bars = contributors.map(item => {
-    const width = `${(probability / 100) * item.value}%`;
-    return `
-      <div class="bar-row">
-        <span>${item.label}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${width};"></div></div>
-        <strong>${item.value}%</strong>
-      </div>
-    `;
-  }).join('');
-
-  document.getElementById('riskContributionBars').innerHTML = bars;
-
-  document.getElementById('aiReasonList').innerHTML = `
-    <li>Rainfall intensity is elevated and sustained over the last 72 hours.</li>
-    <li>Soil moisture is nearing saturation, reducing slope resistance.</li>
-    <li>Slope movement is increasing and may indicate early ground deformation.</li>
-    <li>Current weather condition is amplifying the instability signal.</li>
-  `;
+  document.getElementById('aiReasonList').innerHTML = inputValues.map(item => `<li>${item}</li>`).join('');
 }
 
 function calculateAiProbability(model) {
@@ -2042,6 +2087,11 @@ function getCustomChartTooltip(extraMetrics = true) {
 function renderCharts() {
   appState.chartInstances.forEach(chart => chart.destroy());
   appState.chartInstances = [];
+  // Recover safely after hot reloads or a partially failed render, where a
+  // Chart instance can outlive the in-memory registry above.
+  if (typeof Chart !== 'undefined') {
+    document.querySelectorAll('canvas').forEach(canvas => Chart.getChart(canvas)?.destroy());
+  }
   const chartText = appState.theme === 'light' ? '#25445d' : '#edf5ff';
   const chartMuted = appState.theme === 'light' ? '#667c90' : '#9bb2d1';
   const chartGrid = appState.theme === 'light' ? 'rgba(39, 95, 133, 0.11)' : 'rgba(120, 175, 230, 0.1)';
@@ -2495,17 +2545,21 @@ function buildAlertMessage() {
   const messageBox = document.getElementById('commMessageBox');
   if (messageBox) messageBox.textContent = msg;
 
-  const timeline = ['MESSAGE GENERATED', 'QUEUED', 'DISPATCHED', 'DELIVERY SIMULATED'];
+  const delivered = appState.lastAlertStatus === 'DELIVERED';
+  const timeline = ['PREVIEW GENERATED', delivered ? 'SIMULATION QUEUED' : 'AWAITING SIMULATION', delivered ? 'SIMULATION DISPATCHED' : 'NOT DISPATCHED', delivered ? 'DEMO DELIVERY RECORDED' : 'NO MESSAGE SENT'];
   const timelineTarget = document.getElementById('commTimeline');
-  if (timelineTarget) timelineTarget.innerHTML = timeline.map((item, index) => `
-    <span class="timeline-step complete"><i>${index + 1}</i>${item}</span>
-  `).join('');
+  if (timelineTarget) timelineTarget.innerHTML = timeline.map((item, index) => {
+    const complete = delivered || index === 0;
+    return `<span class="timeline-step ${complete ? 'complete' : 'pending'}"><i>${index + 1}</i>${item}</span>`;
+  }).join('');
 }
 
 function initializeEvents() {
   const showDashboard = () => {
     appState.authenticated = true;
     showApp();
+    document.getElementById('commandCenterHeading')?.focus();
+    window.setTimeout(resetRouteScrollPosition, 120);
   };
 
   const activateCommandNetwork = () => {
@@ -2525,6 +2579,11 @@ function initializeEvents() {
   };
 
   document.getElementById('demoAccessBtn')?.addEventListener('click', showDashboard);
+  document.getElementById('landingCommandCta')?.addEventListener('click', showDashboard);
+  document.getElementById('landingDemoCta')?.addEventListener('click', () => {
+    showDashboard();
+    requestAnimationFrame(() => startLiveDemo());
+  });
 
   document.getElementById('loginForm').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2829,6 +2888,7 @@ function initializeEvents() {
     appState.communication.riskLevel = document.getElementById('commRiskLevel').value;
     appState.communication.targetGroup = document.getElementById('commTargetGroup').value;
     appState.communication.channel = document.getElementById('commChannel').value;
+    appState.lastAlertStatus = 'READY';
     buildAlertMessage();
   });
 
@@ -2848,15 +2908,19 @@ function initializeEvents() {
     const phone = document.getElementById('helpPhone').value || 'Unknown';
     const location = document.getElementById('helpLocation').value || getSelectedLocation().name;
     const type = document.getElementById('helpType').value;
-    appState.emergencyRequests.unshift({ name, type, location, status: 'Sent to response center' });
-    const linkedIncident = { id: `INC-${Date.now().toString().slice(-4)}`, location, risk: getEndRiskLabel(riskScoreFromLocation(getSelectedLocation())), status: 'NEW', authority: 'Prototype Control Room', team: 'Unassigned', priority: type, lastUpdated: 'Now', eta: 'Pending' };
+    const requestSuffix = Date.now().toString().slice(-5);
+    const requestId = `HELP-${requestSuffix}`;
+    const incidentId = `INC-${requestSuffix}`;
+    appState.emergencyRequests.unshift({ id: requestId, name, phone, type, location, status: 'Recorded in local demo' });
+    const linkedIncident = { id: incidentId, location, risk: getEndRiskLabel(riskScoreFromLocation(getSelectedLocation())), status: 'NEW', authority: 'Prototype Control Room', team: 'Unassigned', priority: type, lastUpdated: 'Now', eta: 'Pending' };
     incidentTableData.unshift(linkedIncident);
+    appState.latestEmergencyRequest = { id: requestId, incidentId, type, location };
     alertBank.unshift({ id: `AL-${Date.now().toString().slice(-4)}`, location, district: getSelectedLocation().district, riskLevel: linkedIncident.risk, probability: `${riskScoreFromLocation(getSelectedLocation())}%`, time: `${nowStamp()} IST`, factors: [type, 'Citizen-submitted request'], action: 'Review and assign response team', status: 'Active' });
     logCommand('CITIZEN', 'Emergency request received', `${name} reported ${type} assistance needed at ${location}.`, 'red');
-    appState.citizenStatus = 'Your emergency request has been sent to the prototype response control center.';
+    appState.citizenStatus = 'Your request has been recorded in this local prototype.';
     document.getElementById('helpForm').classList.add('hidden');
     renderAll();
-    showToast(`Emergency request ${linkedIncident.id} created`, 'warning');
+    showToast(`Demo request ${requestId} recorded`, 'warning');
   });
 
   document.querySelectorAll('.period-btn').forEach(button => {
@@ -2918,6 +2982,24 @@ function initializeEvents() {
   document.getElementById('assistantClose')?.addEventListener('click', () => setAssistantState('closed'));
 
   document.addEventListener('click', event => {
+    const mapZone = event.target.closest('[data-open-map-zone]');
+    if (mapZone) {
+      const locationId = Number(mapZone.dataset.openMapZone);
+      if (locationCatalog.some(location => location.id === locationId)) {
+        appState.selectedSensorId = null;
+        appState.selectedIncidentId = null;
+        appState.mapZoom = 1.45;
+        appState.mapRiskFilter = 'all';
+        for (const [id, value] of [['searchLocation', ''], ['mapRiskFilter', 'all'], ['mapStateFilter', 'all'], ['mapDistrictFilter', 'all'], ['mapSensorFilter', 'all']]) {
+          const control = document.getElementById(id);
+          if (control) control.value = value;
+        }
+        navigateTo('map', { locationId });
+        requestAnimationFrame(() => focusMapOnLocation(getSelectedLocation()));
+      }
+      return;
+    }
+
     const notification = event.target.closest('[data-notification-goto]');
     if (notification) {
       navigateTo(notification.dataset.notificationGoto);
@@ -2937,7 +3019,7 @@ function initializeEvents() {
         renderAll();
         showToast(`${alert.id} acknowledged`, 'success');
       }
-      if (alertAction.dataset.alertAction === 'view' && alert) openDrawer(`<div class="eyebrow">ZONE INTELLIGENCE</div><h3>${alert.location}</h3><p>${alert.action}</p><p>Probability: ${alert.probability} • Status: ${alert.status}</p>`);
+      if (alertAction.dataset.alertAction === 'view' && alert) openDrawer(`<div class="eyebrow">ZONE INTELLIGENCE</div><h3>${escapeHtml(alert.location)}</h3><p>${escapeHtml(alert.action)}</p><p>Probability: ${escapeHtml(alert.probability)} • Status: ${escapeHtml(alert.status)}</p>`);
     }
 
     const incidentAction = event.target.closest('[data-incident-action]');

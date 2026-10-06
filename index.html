@@ -190,6 +190,67 @@
           </ol>
           <p class="story-disclosure">Prototype demonstration · data, warnings, and response actions are simulated.</p>
         </section>
+        <section class="landing-story impact-story" aria-labelledby="impactStoryTitle">
+          <div class="story-heading story-reveal" data-story-reveal>
+            <div class="eyebrow">BUILT FOR INDIA'S DISASTER LANDSCAPE</div>
+            <h2 id="impactStoryTitle">One response picture for many hazards.</h2>
+            <p>Designed as a multi-hazard intelligence concept, with a Northeast India landslide scenario in this prototype.</p>
+          </div>
+          <ul class="hazard-list" aria-label="Disaster types within the platform's design scope">
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">≈</span>Floods</li>
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">△</span>Landslides</li>
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">✳</span>Earthquakes</li>
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">◌</span>Cyclones</li>
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">♨</span>Forest fires</li>
+            <li class="story-reveal" data-story-reveal><span aria-hidden="true">☂</span>Extreme rainfall</li>
+          </ul>
+          <div class="pilot-scale story-reveal" data-story-reveal>
+            <div><span>PILOT DEMONSTRATION</span><strong>Northeast India</strong><small>Illustrative regional sample records</small></div>
+            <i aria-hidden="true">→</i>
+            <div><span>FUTURE VISION</span><strong>Pan-India network</strong><small>Requires validated data and agency integration</small></div>
+          </div>
+        </section>
+        <section class="landing-story innovation-story" aria-labelledby="innovationStoryTitle">
+          <div class="story-heading story-reveal" data-story-reveal>
+            <div class="eyebrow">WHAT MAKES BHOOSHANKET DIFFERENT</div>
+            <h2 id="innovationStoryTitle">Connect the signal to the next action.</h2>
+          </div>
+          <div class="innovation-grid">
+            <article class="innovation-card story-reveal" data-story-reveal><span>01</span><h3>Predictive</h3><p>A transparent weighted prototype score makes sample risk inputs inspectable.</p></article>
+            <article class="innovation-card story-reveal" data-story-reveal><span>02</span><h3>Unified</h3><p>Weather context, map zones, sensor records, alerts, and incidents share one demo workspace.</p></article>
+            <article class="innovation-card story-reveal" data-story-reveal><span>03</span><h3>Risk-aware</h3><p>Prefilled route corridors compare sample risk alongside distance and terrain exposure.</p></article>
+            <article class="innovation-card story-reveal" data-story-reveal><span>04</span><h3>Two-way response</h3><p>A simulated authority incident desk connects with a citizen help-request workflow.</p></article>
+          </div>
+          <p class="story-disclosure">These are prototype capabilities demonstrated with local sample data, not deployed emergency services.</p>
+        </section>
+        <section class="landing-story roadmap-story" aria-labelledby="roadmapStoryTitle">
+          <div class="story-heading story-reveal" data-story-reveal>
+            <div class="eyebrow">A TRANSPARENT PATH TO PRODUCTION</div>
+            <h2 id="roadmapStoryTitle">Prototype today. Integrate responsibly.</h2>
+          </div>
+          <ol class="roadmap-list">
+            <li class="roadmap-current story-reveal" data-story-reveal><span>CURRENT</span><strong>Local prototype</strong><small>Weighted score · sample map · simulated workflows</small></li>
+            <li class="story-reveal" data-story-reveal><span>PHASE 2</span><strong>Weather data APIs</strong><small>Validated feeds, coverage, and uptime</small></li>
+            <li class="story-reveal" data-story-reveal><span>PHASE 3</span><strong>IoT integration</strong><small>Field sensors with calibration and maintenance</small></li>
+            <li class="story-reveal" data-story-reveal><span>PHASE 4</span><strong>Trained risk models</strong><small>Validated data, evaluation, and local review</small></li>
+            <li class="story-reveal" data-story-reveal><span>PHASE 5</span><strong>Authority integration</strong><small>Approved alert and response channels</small></li>
+            <li class="roadmap-vision story-reveal" data-story-reveal><span>VISION</span><strong>Pan-India intelligence network</strong><small>Built with responsible regional deployment</small></li>
+          </ol>
+          <p class="story-disclosure">Roadmap items are planned future work; they are not currently connected or operational.</p>
+        </section>
+        <section class="landing-story final-cta-story" aria-labelledby="finalCtaTitle">
+          <div class="final-cta-panel story-reveal" data-story-reveal>
+            <div class="eyebrow">BHOOSHANKET AI · DISASTER INTELLIGENCE</div>
+            <h2 id="finalCtaTitle">Every second matters.</h2>
+            <p>Predict earlier. Respond faster. Protect more lives.</p>
+            <div class="final-cta-actions">
+              <button type="button" class="primary-btn" id="landingCommandCta">ENTER COMMAND CENTER</button>
+              <button type="button" class="secondary-btn" id="landingDemoCta">WATCH LIVE DEMO</button>
+            </div>
+            <span class="final-cta-tagline">PREDICT. ALERT. RESPOND. PROTECT.</span>
+            <small>Live demo runs the simulated scenario using sample data.</small>
+          </div>
+        </section>
       </div>
 
       <div class="app-shell hidden" id="appShell">
@@ -240,18 +301,16 @@
               <div class="header-brand-mount" id="headerBrandMount"></div>
               <div>
                 <div class="eyebrow" id="greetingLine">COMMAND AUTHORITY</div>
-                <h2>BhooShanket AI Command Center</h2>
+                <h2 id="commandCenterHeading" tabindex="-1">BhooShanket AI Command Center</h2>
               </div>
             </div>
             <div class="region-breadcrumb" id="regionBreadcrumb" aria-label="Regional intelligence context">
               <span>REGIONAL INTELLIGENCE</span><strong>NORTH-EAST INDIA</strong><i>›</i><strong id="headerState">MEGHALAYA</strong><i>›</i><strong id="headerDistrict">EAST KHASI HILLS</strong><i>›</i><strong id="headerZone">SHILLONG ZONE</strong>
             </div>
             <div class="topbar-actions">
-              <div class="live-status">
-                <span class="pulse"></span>
-                REGIONAL MONITOR
+              <div class="demo-mode-indicator" role="status" aria-label="Demo mode. Data shown is simulated.">
+                <span aria-hidden="true">●</span> DEMO MODE · SIMULATED DATA
               </div>
-              <div class="sim-label">SIMULATED DEMO DATA</div>
               <div class="date-pill" id="dateStamp">—</div>
               <div class="clock-pill" id="clockStamp">—</div>
               <div class="notification-menu">
@@ -283,7 +342,7 @@
           </header>
 
           <section class="view active" data-view-panel="dashboard">
-            <div class="metrics-grid" id="metricsGrid"></div>
+            <div class="metrics-grid" id="metricsGrid" role="group" aria-label="Supporting command center metrics"></div>
             <section class="card response-flow-card" aria-labelledby="responseFlowTitle">
               <div class="response-flow-intro">
                 <div class="eyebrow">ONE CONNECTED RESPONSE NETWORK</div>
@@ -303,7 +362,7 @@
               <div class="card risk-card large-card">
                 <div class="card-header">
                   <div>
-                    <div class="eyebrow">CURRENT PROTOTYPE LANDSLIDE RISK</div>
+                    <div class="eyebrow">CURRENT REGIONAL RISK</div>
                     <h3 id="selectedLocationName">Shillong Monitoring Zone</h3>
                   </div>
                   <div class="location-selectors compact inline">
@@ -325,22 +384,20 @@
                     <div class="instrument-meta">
                       <div><span>MODEL TYPE</span><strong id="aiConfidenceValue">PROTOTYPE</strong></div>
                       <div><span>REGION</span><strong id="regionIndicator">Meghalaya • Zone</strong></div>
-                      <div><span>UPDATED</span><strong id="riskTimestamp">—</strong></div>
+                      <div><span>EVALUATED</span><strong id="riskTimestamp">—</strong></div>
                     </div>
-                    <svg class="mini-trend" id="riskMiniTrend" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"></svg>
                   </div>
                   <div class="risk-details">
                     <div class="fact-list">
-                      <div><span>Rainfall</span><strong id="rainfallFact">HIGH</strong></div>
-                      <div><span>Soil Moisture</span><strong id="moistureFact">HIGH</strong></div>
-                      <div><span>Slope Movement</span><strong id="movementFact">ELEVATED</strong></div>
+                      <div><span>Rainfall</span><strong id="rainfallFact">—</strong></div>
+                      <div><span>Soil Moisture</span><strong id="moistureFact">—</strong></div>
+                      <div><span>Slope Movement</span><strong id="movementFact">—</strong></div>
                       <div><span>Weather Condition</span><strong id="conditionFact">HEAVY RAIN</strong></div>
                     </div>
                     <p id="aiInsight">Persistent rainfall and increasing soil saturation are contributing to elevated slope instability.</p>
                     <div class="why-box">
-                      <h4>WHY DID THE AI PREDICT THIS?</h4>
-                      <p id="riskMatterText">Increased rainfall and ground saturation reduce slope strength, raising the chance of slope failure during short, intense downpours.</p>
-                      <div class="bars" id="dashboardContributionBars"></div>
+                      <h4>WHY THIS RISK SCORE?</h4>
+                      <p id="riskMatterText">The prototype score combines a stored demo-zone baseline with the selected simulation phase. The readings above are shown as context; they do not establish a verified forecast.</p>
                       <div class="inline-actions">
                         <button type="button" class="action-btn" data-goto="prediction">VIEW AI ANALYSIS</button>
                         <button type="button" class="action-btn" data-goto="map">OPEN RISK MAP</button>
@@ -356,7 +413,6 @@
                     <div class="eyebrow">ENVIRONMENTAL INTELLIGENCE</div>
                     <h3>Current Weather</h3>
                   </div>
-                  <div class="badge danger" id="weatherBadge">SIMULATED ENVIRONMENTAL DATA</div>
                 </div>
                 <div class="weather-grid" id="weatherGrid"></div>
               </div>
@@ -365,22 +421,22 @@
               <div class="card">
                 <div class="card-header split">
                   <div>
-                    <div class="eyebrow">SIMULATED INCIDENTS</div>
-                    <h3>Incident Command Feed</h3>
+                    <div class="eyebrow">PRIORITY QUEUE</div>
+                    <h3>Active Alerts</h3>
                   </div>
                   <button type="button" class="action-btn" data-goto="alerts">ALERT CENTER</button>
                 </div>
-                <div class="incident-feed" id="liveIncidentFeed"></div>
+                <div class="dashboard-alert-list" id="dashboardAlerts" aria-live="polite"></div>
               </div>
               <div class="card">
                 <div class="card-header split">
                   <div>
-                    <div class="eyebrow">SIMULATED SENSOR RECORDS</div>
-                    <h3>Network Waveforms</h3>
+                    <div class="eyebrow">REGIONAL OVERVIEW</div>
+                    <h3>Highest-Risk Zones</h3>
                   </div>
-                  <button type="button" class="action-btn" data-goto="sensors">SENSOR MONITORING</button>
+                  <button type="button" class="action-btn" data-goto="map">OPEN RISK MAP</button>
                 </div>
-                <div class="telemetry-grid" id="telemetryGrid"></div>
+                <div class="dashboard-zone-list" id="dashboardZones" aria-label="Top three zones by prototype risk score"></div>
               </div>
             </div>
             <div class="dashboard-ops">
@@ -411,10 +467,14 @@
                   <div class="eyebrow">OPERATIONAL EVENT STREAM</div>
                   <h3>Incident Command Timeline</h3>
                 </div>
-                <div class="badge neutral">AUDITABLE SIMULATION LOG</div>
+                <div class="badge neutral">LOCAL EVENT LOG</div>
               </div>
               <div class="command-log" id="commandLog"></div>
             </div>
+            <section class="card dashboard-analytics-card" aria-labelledby="dashboardAnalyticsTitle">
+              <div><div class="eyebrow">DECISION SUPPORT</div><h3 id="dashboardAnalyticsTitle">Detailed analytics</h3><p>Compare sample risk trends, environmental inputs, and zone distribution.</p></div>
+              <button type="button" class="action-btn" data-goto="analytics">OPEN ANALYTICS</button>
+            </section>
           </section>
 
           <section class="view" data-view-panel="map">
@@ -482,8 +542,8 @@
             <div class="card prediction-card">
               <div class="card-header">
                 <div>
-                  <div class="eyebrow">AI LANDSLIDE RISK PREDICTION ENGINE</div>
-                  <h3>Prototype AI Simulation</h3>
+                  <div class="eyebrow">LANDSLIDE RISK · DEMO MODEL</div>
+                  <h3>Prototype Weighted Risk Model</h3>
                 </div>
                 <div class="badge neutral">TRANSPARENT WEIGHTED RISK MODEL</div>
               </div>
@@ -540,7 +600,7 @@
                     <strong id="aiProbability">78%</strong>
                     <small id="aiRiskLabel">HIGH RISK</small>
                   </div>
-                  <div class="forecast-strip" id="forecastStrip"></div>
+                  <div class="model-note" id="modelNote"></div>
                   <div class="pipeline">
                     <span>ENVIRONMENTAL DATA</span>
                     <span>↓</span>
@@ -552,14 +612,14 @@
                     <span>↓</span>
                     <span>PROTOTYPE RISK SCORE</span>
                     <span>↓</span>
-                    <span>EARLY WARNING DECISION</span>
+                    <span>DEMO REVIEW WORKFLOW</span>
                   </div>
                   <div class="impact-card">
-                    <h4>WHY DID THE AI PREDICT THIS?</h4>
+                    <h4>HOW THIS SCORE IS CALCULATED</h4>
                     <ul id="aiReasonList"></ul>
                   </div>
                   <div class="contribution-box">
-                    <h4>Risk Contribution Model</h4>
+                    <h4>Current input score points</h4>
                     <div class="bars" id="riskContributionBars"></div>
                   </div>
                 </div>
@@ -659,10 +719,11 @@
             <div class="card">
               <div class="card-header">
                 <div>
-                  <div class="eyebrow">AUTHORITY RESPONSE SYSTEM</div>
+                  <div class="eyebrow">AUTHORITY RESPONSE · LOCAL DEMO</div>
                   <h3>Incident Management</h3>
                 </div>
               </div>
+              <p class="auth-note response-disclosure">Advance each incident through triage, team assignment, dispatch, on-scene, and resolution. All records and team statuses are simulated locally.</p>
               <div class="incident-table" id="incidentTable"></div>
             </div>
           </section>
@@ -683,7 +744,7 @@
             <div class="card citizen-card">
               <div class="card-header">
                 <div>
-                  <div class="eyebrow">CITIZEN SAFETY INTERFACE</div>
+                  <div class="eyebrow">CITIZEN SAFETY · LOCAL DEMO</div>
                   <h3>Are You Safe?</h3>
                 </div>
               </div>
@@ -709,8 +770,8 @@
             <div class="card route-card-shell">
               <div class="card-header split">
                 <div>
-                  <div class="eyebrow">INTELLIGENT SAFE ROUTE FINDER</div>
-                  <h3>Find Safest Route</h3>
+                  <div class="eyebrow">RISK-AWARE ROUTE · DEMO CORRIDORS</div>
+                  <h3>The safest route isn't always the shortest.</h3>
                 </div>
                 <div class="badge neutral" id="routeModeBadge">TERRAIN RISK AVOIDANCE</div>
               </div>
