@@ -22,6 +22,11 @@ const appState = {
   systemMode: 'ACTIVE MONITORING',
   selectedLocationId: 2,
   mapZoom: 1.0,
+  mapPanX: 0,
+  mapPanY: 0,
+  mapMode: 'manual',
+  mapMonitorTimer: null,
+  demoStepIndex: 0,
   activeCorridor: 'safest',
   reroutingActive: false,
   reroutingStage: 0,
@@ -78,7 +83,7 @@ const appState = {
   telemetrySource: 'LOCAL SIMULATION',
   telemetryLastSync: null,
   commandEvents: [
-    { time: '05:42', type: 'SYSTEM', title: 'Regional monitoring initialized', detail: '247 sensor endpoints synchronized across the North East network.', tone: 'blue' },
+    { time: '05:42', type: 'SYSTEM', title: 'Prototype monitoring initialized', detail: 'Eight simulated sensor records are available across the demo region.', tone: 'blue' },
     { time: '05:48', type: 'SENSOR', title: 'Rainfall threshold crossed', detail: 'Shillong rain sensor RS-104 moved into elevated observation.', tone: 'yellow' },
     { time: '05:52', type: 'AUTHORITY', title: 'Response desk on standby', detail: 'District control room briefing is ready for escalation.', tone: 'green' }
   ]
@@ -177,12 +182,10 @@ const energyModes = ENERGY_MODES.map((label, index) => ({
 }));
 
 const metricTemplates = [
-  { label: 'ACTIVE ALERTS', value: 14, icon: '⚑', color: '#ff4d5f', trend: '+2.4%', goto: 'alerts' },
-  { label: 'CRITICAL ZONES', value: 6, icon: '◇', color: '#ff9c45', trend: '+1.1%', goto: 'map' },
-  { label: 'SENSORS ONLINE', value: 247, icon: '▣', color: '#42c4ff', trend: '+24', goto: 'sensors' },
-  { label: 'RAINFALL', value: 82, icon: '▣', color: '#5ea1ff', trend: 'mm/hr', goto: 'weather', unit: ' mm/hr' },
-  { label: 'SOIL MOISTURE', value: 78, icon: '◍', color: '#32d597', trend: '%', goto: 'sensors', unit: '%' },
-  { label: 'SLOPE MOVEMENT', value: 66, icon: '△', color: '#f5c75b', trend: 'mm', goto: 'prediction', unit: ' mm' }
+  { label: 'ACTIVE DEMO ALERTS', value: 0, icon: '⚑', color: '#ff586f', trend: 'SIMULATED', goto: 'alerts' },
+  { label: 'ELEVATED-RISK ZONES', value: 0, icon: '◇', color: '#ff9c4a', trend: 'OF 8 DEMO ZONES', goto: 'map' },
+  { label: 'SENSOR RECORDS', value: 0, icon: '▣', color: '#68b8ff', trend: 'SIMULATED', goto: 'sensors' },
+  { label: 'SAFE ZONE RECORDS', value: 0, icon: '⌂', color: '#39dd9d', trend: 'DEMO INVENTORY', goto: 'zones' }
 ];
 
 const riskThresholds = {
@@ -194,9 +197,9 @@ const riskThresholds = {
 
 const phaseDefinitions = [
   { label: 'Phase 01 — Normal Conditions', risk: 18, rainfall: 26, humidity: 60, soil: 40, slope: 24, weather: 'Partly Cloudy', rainfall24: 32, rainfall72: 78 },
-  { label: 'Phase 02 — Warning Signs', risk: 45, rainfall: 52, humidity: 73, soil: 58, slope: 39, weather: 'Showers', rainfall24: 84, rainfall72: 160 },
-  { label: 'Phase 03 — High Risk', risk: 74, rainfall: 81, humidity: 88, soil: 74, slope: 58, weather: 'Heavy Rain', rainfall24: 132, rainfall72: 322 },
-  { label: 'Phase 04 — Critical Event', risk: 94, rainfall: 94, humidity: 95, soil: 90, slope: 82, weather: 'Cloudburst', rainfall24: 210, rainfall72: 438 }
+  { label: 'Phase 02 — Warning Signs', risk: 42, rainfall: 52, humidity: 73, soil: 58, slope: 39, weather: 'Showers', rainfall24: 84, rainfall72: 160 },
+  { label: 'Phase 03 — High Risk', risk: 71, rainfall: 81, humidity: 88, soil: 74, slope: 58, weather: 'Heavy Rain', rainfall24: 132, rainfall72: 322 },
+  { label: 'Phase 04 — Critical Event', risk: 91, rainfall: 94, humidity: 95, soil: 90, slope: 82, weather: 'Cloudburst', rainfall24: 210, rainfall72: 438 }
 ];
 
 function getEndRiskLabel(value) {
@@ -339,8 +342,7 @@ function logCommand(type, title, detail, tone = 'blue') {
 }
 
 function aiConfidence() {
-  const selected = getSelectedLocation();
-  return Math.min(98, Math.round(78 + (selected.sensorStatus === 'warning' ? 8 : 12) + appState.phaseIndex * 2));
+  return 'PROTOTYPE';
 }
 
 function getFactorContributions() {
@@ -358,17 +360,18 @@ function getFactorContributions() {
 
 function explanationCopy(level) {
   const selected = getSelectedLocation();
-  if (level === 'CRITICAL') return `Extreme rainfall near ${selected.name}, high soil saturation, and significant slope movement have driven a critical landslide probability.`;
-  if (level === 'HIGH') return `Heavy rainfall combined with increasing soil saturation and slope movement has significantly increased landslide probability.`;
-  if (level === 'MEDIUM') return `Rising rainfall and soil moisture are elevating slope sensitivity. Continued monitoring is required.`;
-  return `Environmental conditions remain largely stable. Routine observation is sufficient.`;
+  const inputs = `rainfall ${selected.rainfall} mm/hr, soil moisture ${selected.soilMoisture}%, and slope movement ${selected.slopeMovement} mm`;
+  if (level === 'CRITICAL') return `The prototype weighted risk score is critical for ${selected.name}, based on demo inputs including ${inputs}. This illustrative score is not a verified forecast or public warning.`;
+  if (level === 'HIGH') return `The prototype weighted risk score is elevated for ${selected.name}, based on demo inputs including ${inputs}. Use official local guidance for real-world decisions.`;
+  if (level === 'MEDIUM') return `The prototype weighted risk score is moderate for ${selected.name}. Demo inputs include ${inputs}; this is an illustrative model output.`;
+  return `The prototype weighted risk score is low for ${selected.name}. The environmental values are simulated and do not establish that a location is safe.`;
 }
 
 function recommendedAction(risk) {
-  if (risk >= riskThresholds.CRITICAL.min) return 'Prepare evacuation and keep high-risk corridors closed.';
-  if (risk >= riskThresholds.HIGH.min) return 'Escalate warning advisory and ready response teams.';
-  if (risk >= 31) return 'Increase patrol cadence and validate sensor health.';
-  return 'Continue routine observation.';
+  if (risk >= riskThresholds.CRITICAL.min) return 'Review the demo response workflow and consult official guidance.';
+  if (risk >= riskThresholds.HIGH.min) return 'Review the simulated advisory and response plan.';
+  if (risk >= 31) return 'Inspect the demo inputs and validate sample sensor records.';
+  return 'Continue observing the illustrative demo indicators.';
 }
 
 function syncAiModelFromLocation(location = getSelectedLocation()) {
@@ -428,9 +431,21 @@ function resetRouteScrollPosition() {
 
 function setView(view, { forceScroll = false } = {}) {
   if (!VIEWS.includes(view)) view = 'dashboard';
+  if (view !== 'map' && appState.mapMode === 'monitor') {
+    stopMapMonitor();
+    appState.mapMode = 'manual';
+    document.querySelectorAll('[data-map-mode]').forEach(button => {
+      const active = button.dataset.mapMode === 'manual';
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const modeStatus = document.getElementById('mapModeStatus');
+    if (modeStatus) modeStatus.textContent = 'Manual exploration · simulated regional map';
+  }
   const isRouteChange = forceScroll || view !== appState.activeView;
   appState.activeView = view;
   document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+  document.querySelectorAll('.mobile-tab[data-view]').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
   document.querySelectorAll('.view').forEach(section => {
     const active = section.dataset.viewPanel === view;
     section.classList.toggle('active', active);
@@ -441,6 +456,7 @@ function setView(view, { forceScroll = false } = {}) {
   });
   if (location.hash.replace('#', '') !== view) history.replaceState(null, '', `#${view}`);
   document.body.classList.remove('nav-open');
+  document.getElementById('mobileMoreToggle')?.setAttribute('aria-expanded', 'false');
   document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', 'false');
   if (isRouteChange) resetRouteScrollPosition();
   if (view === 'analytics' || view === 'weather') renderCharts();
@@ -459,6 +475,7 @@ function navigateTo(view, options = {}) {
 
 function showApp() {
   appState.authenticated = true;
+  document.body.classList.add('app-authenticated');
   appState.authUser = getStoredAuthUser() || appState.authUser || { name: 'Authority', email: '' };
   document.getElementById('bootOverlay')?.remove();
   document.getElementById('loginScreen').classList.add('hidden');
@@ -478,6 +495,7 @@ function showApp() {
 
 function showLogin() {
   appState.authenticated = false;
+  document.body.classList.remove('app-authenticated');
   appState.authUser = null;
   if (appState.demoTimer) {
     clearInterval(appState.demoTimer);
@@ -520,12 +538,12 @@ function showCriticalEvent(location, risk) {
   const card = document.getElementById('cinematicCard');
   if (!overlay || !card) return;
   card.innerHTML = `
-    <div class="cinematic-kicker">EARLY WARNING ACTIVATED</div>
-    <h2>CRITICAL LANDSLIDE EVENT</h2>
+    <div class="cinematic-kicker">DEMO SIMULATION · RESPONSE WORKFLOW</div>
+    <h2>CRITICAL RISK SCENARIO</h2>
     <div class="cinematic-location">${location.name.toUpperCase()} <span>•</span> ${location.district.toUpperCase()}</div>
     <div class="cinematic-risk"><strong>${risk}%</strong><span>AI RISK PROBABILITY</span></div>
     <div class="cinematic-flow">
-      <span>AUTHORITY NOTIFIED</span><i></i><span>RESCUE TEAM DISPATCHED</span><i></i><span>CITIZEN ALERT ACTIVE</span><i></i><span>SAFE ROUTE UPDATED</span>
+      <span>AUTHORITY STEP SIMULATED</span><i></i><span>TEAM ASSIGNMENT SIMULATED</span><i></i><span>PUBLIC ALERT NOT SENT</span><i></i><span>DEMO ROUTE UPDATED</span>
     </div>
   `;
   overlay.classList.remove('hidden');
@@ -610,9 +628,17 @@ function renderNotifications() {
 }
 
 async function syncExternalTelemetry() {
+  const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+  const gatewayUrl = String(env.VITE_BHOOSHANKET_TELEMETRY_URL || '').trim();
+  if (!gatewayUrl) {
+    appState.telemetrySource = 'LOCAL SIMULATION';
+    return;
+  }
   const selected = getSelectedLocation();
   try {
-    const response = await fetch(`http://127.0.0.1:8010/api/telemetry?location=${encodeURIComponent(selected.name)}`, { cache: 'no-store' });
+    const telemetryUrl = new URL(gatewayUrl, window.location.href);
+    telemetryUrl.searchParams.set('location', selected.name);
+    const response = await fetch(telemetryUrl, { cache: 'no-store' });
     if (!response.ok) throw new Error('Gateway unavailable');
     const payload = await response.json();
     const readings = payload.readings || {};
@@ -645,16 +671,13 @@ function renderCommandLog() {
 }
 
 function renderMetrics() {
-  const selected = getSelectedLocation();
-  const risk = riskScoreFromLocation(selected);
-  const online = 247 - (appState.phaseIndex === 3 ? 1 : 0);
+  const openAlerts = alertBank.filter(alert => !['resolved', 'acknowledged'].includes(String(alert.status).toLowerCase())).length;
+  const elevatedZones = locationCatalog.filter(location => riskScoreFromLocation(location) >= riskThresholds.HIGH.min).length;
   const metrics = [
-    { ...metricTemplates[0], value: Math.max(8, Math.round((risk / 100) * 18 + 4)) },
-    { ...metricTemplates[1], value: locationCatalog.filter(loc => getEndRiskLabel(riskScoreFromLocation(loc)) === 'CRITICAL').length || Math.max(1, Math.round(risk / 25)) },
-    { ...metricTemplates[2], value: online },
-    { ...metricTemplates[3], value: selected.rainfall },
-    { ...metricTemplates[4], value: selected.soilMoisture },
-    { ...metricTemplates[5], value: selected.slopeMovement }
+    { ...metricTemplates[0], value: openAlerts },
+    { ...metricTemplates[1], value: elevatedZones },
+    { ...metricTemplates[2], value: sensorCatalog.length },
+    { ...metricTemplates[3], value: safeZoneData.length }
   ];
 
   document.getElementById('metricsGrid').innerHTML = metrics.map(metric => `
@@ -814,7 +837,7 @@ function renderRiskOverview() {
   document.getElementById('aiInsight').textContent = explanationCopy(level);
   document.getElementById('riskMatterText').textContent = explanationCopy(level);
   const confidenceEl = document.getElementById('aiConfidenceValue');
-  if (confidenceEl) countTo(confidenceEl, aiConfidence(), '%');
+  if (confidenceEl) confidenceEl.textContent = aiConfidence();
   const regionEl = document.getElementById('regionIndicator');
   if (regionEl) regionEl.textContent = `${selected.state} • ${selected.district}`;
   const ts = document.getElementById('riskTimestamp');
@@ -1226,7 +1249,7 @@ function renderRoute() {
     <div class="route-summary">
       <h4>PROTOTYPE ROUTE SIMULATION</h4>
       <p><strong>Active Corridor:</strong> ${corridor.name}</p>
-      <p>Path navigation dynamically evaluates slope inclinometers, historical debris channels, and real-time precipitation radars. High-risk corridors are locked when saturation exceeds 75%.</p>
+      <p>This illustrative route comparison uses the prototype's prefilled corridor scores. It does not use verified road conditions, live radar, or turn-by-turn navigation.</p>
       
       <h5 style="margin: 14px 0 8px; font-size: 0.76rem; letter-spacing: 0.1em; color: var(--muted);">CORRIDOR CHECKPOINTS &amp; GROUND CONDITIONS</h5>
       <div style="display: grid; gap: 6px;">
@@ -1450,9 +1473,16 @@ function renderMap() {
     `;
   }).join('');
 
+  const sensorMarkersHtml = showSensors ? sensorCatalog.map((sensor, index) => {
+    const location = locationCatalog.find(item => item.name === sensor.location);
+    if (!location) return '';
+    const offset = (index % 4) * 2.2;
+    return `<button type="button" class="sensor-map-marker" data-sensor-id="${sensor.id}" style="left:calc(${location.mapX}% + ${offset}px);top:calc(${location.mapY}% + ${(index % 3) * 10 - 14}px)" aria-label="Inspect simulated sensor ${sensor.id}, ${sensor.name}"><span aria-hidden="true">⌁</span></button>`;
+  }).join('') : '';
+
   mapViewport.innerHTML = `
     <div class="map-telemetry">
-      <span>LIVE GEOSPATIAL TELEMETRY</span>
+      <span>SIMULATED REGIONAL MAP</span>
       <strong>${selected.name.toUpperCase()} • ${riskScoreFromLocation(selected)}% ${getEndRiskLabel(riskScoreFromLocation(selected))}</strong>
     </div>
 
@@ -1467,7 +1497,7 @@ function renderMap() {
 
     <div class="map-radar-sweep-beam"></div>
 
-    <div class="map-stage-scalable" style="position: absolute; inset: 0; width: 100%; height: 100%; transform: scale(${zoom}); transform-origin: 50% 50%; transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);">
+    <div class="map-stage-scalable" style="position: absolute; inset: 0; width: 100%; height: 100%; transform: translate(${appState.mapPanX}px, ${appState.mapPanY}px) scale(${zoom}); transform-origin: 50% 50%; transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);">
       <svg class="ner-svg-map" viewBox="0 0 1000 700" preserveAspectRatio="none">
         <defs>
           <filter id="mapBlur" x="-30%" y="-30%" width="160%" height="160%">
@@ -1532,6 +1562,7 @@ function renderMap() {
 
       <!-- Active Marker Overlay -->
       ${markersHtml}
+      ${sensorMarkersHtml}
     </div>
 
     <!-- Floating HUD Hover Tooltip -->
@@ -1576,6 +1607,7 @@ function renderMap() {
     });
 
     wrapper.addEventListener('click', () => {
+      appState.selectedSensorId = null;
       appState.selectedLocationId = loc.id;
       appState.demoRiskOverride = null;
       syncAiModelFromLocation(loc);
@@ -1583,17 +1615,126 @@ function renderMap() {
       showToast(`Selected monitoring zone: ${loc.name}`, 'info');
     });
   });
+  mapViewport.querySelectorAll('[data-sensor-id]').forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      appState.selectedSensorId = button.dataset.sensorId;
+      const sensor = sensorCatalog.find(item => item.id === appState.selectedSensorId);
+      const location = locationCatalog.find(item => item.name === sensor?.location);
+      if (location) appState.selectedLocationId = location.id;
+      renderMapInfoPanel();
+    });
+  });
+
+  const stage = mapViewport.querySelector('.map-stage-scalable');
+  let drag = null;
+  mapViewport.onpointerdown = event => {
+    if (event.target.closest('.marker-wrapper, button, select, input, .map-telemetry, .map-legend')) return;
+    drag = { x: event.clientX, y: event.clientY, panX: appState.mapPanX, panY: appState.mapPanY };
+    mapViewport.setPointerCapture?.(event.pointerId);
+    mapViewport.classList.add('is-panning');
+  };
+  mapViewport.onpointermove = event => {
+    if (!drag || !stage) return;
+    appState.mapPanX = drag.panX + event.clientX - drag.x;
+    appState.mapPanY = drag.panY + event.clientY - drag.y;
+    stage.style.transform = `translate(${appState.mapPanX}px, ${appState.mapPanY}px) scale(${zoom})`;
+  };
+  const endPan = () => { drag = null; mapViewport.classList.remove('is-panning'); };
+  mapViewport.onpointerup = endPan;
+  mapViewport.onpointercancel = endPan;
 
   renderMapInfoPanel();
+}
+
+function focusMapOnLocation(location) {
+  const viewport = document.getElementById('mapViewport');
+  const stage = viewport?.querySelector('.map-stage-scalable');
+  if (!viewport || !stage || !location) return;
+  const scale = Math.max(1.35, appState.mapZoom || 1);
+  appState.mapZoom = scale;
+  appState.mapPanX = -((location.mapX / 100) - 0.5) * viewport.clientWidth * scale;
+  appState.mapPanY = -((location.mapY / 100) - 0.5) * viewport.clientHeight * scale;
+  stage.style.transform = `translate(${appState.mapPanX}px, ${appState.mapPanY}px) scale(${scale})`;
+}
+
+function stopMapMonitor() {
+  if (appState.mapMonitorTimer) window.clearInterval(appState.mapMonitorTimer);
+  appState.mapMonitorTimer = null;
+}
+
+function setMapMode(mode) {
+  appState.mapMode = mode;
+  stopMapMonitor();
+  document.querySelectorAll('[data-map-mode]').forEach(button => {
+    const active = button.dataset.mapMode === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  const status = document.getElementById('mapModeStatus');
+  if (status) status.textContent = mode === 'monitor'
+    ? 'Auto monitor · simulated priority zones'
+    : mode === 'demo' ? 'Live demo · simulated camera sequence' : 'Manual exploration · simulated regional map';
+  const viewport = document.getElementById('mapViewport');
+  if (mode === 'manual') {
+    appState.mapZoom = 1;
+    appState.mapPanX = 0;
+    appState.mapPanY = 0;
+    const stage = viewport?.querySelector('.map-stage-scalable');
+    if (stage) stage.style.transform = 'translate(0px, 0px) scale(1)';
+    return;
+  }
+  if (mode === 'demo') {
+    navigateTo('map');
+    setTimeout(() => focusMapOnLocation(getSelectedLocation()), 80);
+    startLiveDemo();
+    return;
+  }
+  navigateTo('map');
+  const candidates = [...locationCatalog].filter(location => riskScoreFromLocation(location) >= riskThresholds.HIGH.min);
+  let index = 0;
+  const visitNextPriorityZone = () => {
+    if (appState.mapMode !== 'monitor' || !candidates.length) return;
+    const location = candidates[index % candidates.length];
+    index += 1;
+    appState.selectedLocationId = location.id;
+    appState.demoRiskOverride = null;
+    renderAll();
+    requestAnimationFrame(() => focusMapOnLocation(location));
+    logCommand('MAP', 'Priority zone in view', `${location.name} · ${riskScoreFromLocation(location)}% simulated risk.`, 'orange');
+  };
+  visitNextPriorityZone();
+  appState.mapMonitorTimer = window.setInterval(visitNextPriorityZone, 9000);
 }
 
 function renderMapInfoPanel() {
   const selected = getSelectedLocation();
   const risk = riskScoreFromLocation(selected);
   const level = getEndRiskLabel(risk);
-  const action = risk >= riskThresholds.CRITICAL.min ? 'Evacuation readiness & emergency corridors open' : risk >= riskThresholds.HIGH.min ? 'Escalate warning advisory & response standby' : 'Routine continuous observation';
+  const action = risk >= riskThresholds.CRITICAL.min ? 'Review local guidance and prepare a response' : risk >= riskThresholds.HIGH.min ? 'Review the simulated advisory and response plan' : 'Continue observing the demo indicators';
   const panel = document.getElementById('mapInfoPanel');
   if (!panel) return;
+
+  const selectedSensor = sensorCatalog.find(sensor => sensor.id === appState.selectedSensorId);
+  if (selectedSensor) {
+    panel.innerHTML = `
+      <div class="eyebrow">SIMULATED SENSOR RECORD</div>
+      <h4>SENSOR #${selectedSensor.id}</h4>
+      <div class="intel-row"><span>Sensor type</span><strong>${selectedSensor.name}</strong></div>
+      <div class="intel-row"><span>Reading</span><strong>${selectedSensor.reading} ${selectedSensor.unit}</strong></div>
+      <div class="intel-row"><span>Connection status</span><strong>${selectedSensor.status.toUpperCase()}</strong></div>
+      <div class="intel-row"><span>Signal</span><strong>${selectedSensor.strength}</strong></div>
+      <div class="intel-row"><span>Battery</span><strong>${selectedSensor.battery}</strong></div>
+      <div class="intel-row"><span>Sample timestamp</span><strong>${selectedSensor.lastUpdated}</strong></div>
+      <p class="auth-note">Illustrative local record · no physical sensor connection is claimed.</p>
+      <button type="button" class="action-btn wide" id="showSelectedZone">VIEW ${selectedSensor.location.toUpperCase()}</button>
+    `;
+    document.getElementById('showSelectedZone')?.addEventListener('click', () => {
+      appState.selectedSensorId = null;
+      renderMapInfoPanel();
+    });
+    return;
+  }
 
   panel.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
@@ -1601,15 +1742,16 @@ function renderMapInfoPanel() {
       <span class="status-chip ${level.toLowerCase()}">${level}</span>
     </div>
     <div class="intel-row"><span>State &amp; District</span><strong>${selected.state} • ${selected.district}</strong></div>
-    <div class="intel-row"><span>AI Landslide Probability</span><strong style="color:${getRiskColor(risk)}; font-size: 1.1rem;">${risk}%</strong></div>
+    <div class="intel-row"><span>Prototype weighted risk score</span><strong style="color:${getRiskColor(risk)}; font-size: 1.1rem;">${risk}%</strong></div>
     <div class="intel-row"><span>Sensor Network Health</span><strong class="status-chip ${selected.sensorStatus}">${selected.sensorStatus.toUpperCase()}</strong></div>
     <div class="intel-row"><span>Rainfall Rate</span><strong>${selected.rainfall} mm/hr</strong></div>
     <div class="intel-row"><span>Soil Saturation</span><strong>${selected.soilMoisture}%</strong></div>
     <div class="intel-row"><span>Slope Movement Velocity</span><strong>${selected.slopeMovement} mm/hr</strong></div>
     <div class="intel-row"><span>Slope Angle</span><strong>${selected.slopeAngle}°</strong></div>
     <div class="intel-row"><span>Current Weather</span><strong>${selected.weather}</strong></div>
-    <div class="intel-row"><span>Configured Safe Zone</span><strong>${selected.safeZones[0]}</strong></div>
+    <div class="intel-row"><span>Listed Safe Zone</span><strong>${selected.safeZones[0]}</strong></div>
     <div class="intel-row"><span>Priority Action Advisory</span><strong>${action}</strong></div>
+    <p class="auth-note">Illustrative demo inputs · not an official warning or verified forecast.</p>
     <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
       <button type="button" class="action-btn wide" data-goto="route">CALCULATE SAFE ROUTE</button>
       <button type="button" class="action-btn wide" data-goto="prediction">RUN AI SIMULATION</button>
@@ -1755,7 +1897,7 @@ function getCustomChartTooltip(extraMetrics = true) {
           '08h': '08:00 AM (Sync 03)',
           '12h': '12:00 PM (Sync 04)',
           '18h': '06:00 PM (Sync 05)',
-          'Now': '12:42 PM (Live Telemetry)',
+          'Now': 'Current sample point',
           'Mon': 'Monday · 12:42 PM',
           'Tue': 'Tuesday · 12:42 PM',
           'Wed': 'Wednesday · 12:42 PM',
@@ -1763,7 +1905,7 @@ function getCustomChartTooltip(extraMetrics = true) {
           'Fri': 'Friday · 12:42 PM',
           'Sat': 'Saturday · 12:42 PM'
         };
-        return timeMap[raw] || `${raw} · 12:42 PM`;
+        return timeMap[raw] || `${raw} · sample timeline`;
       },
       afterBody(items) {
         if (!extraMetrics) return [];
@@ -2034,12 +2176,16 @@ function renderCharts() {
 
   // 8. Sensor Health Doughnut
   if (ctxSensorHealth) {
-    appState.chartInstances.push(new Chart(ctxSensorHealth, {
+        appState.chartInstances.push(new Chart(ctxSensorHealth, {
       type: 'doughnut',
       data: {
         labels: ['Online (Normal)', 'Warning (Elevated)', 'Offline'],
         datasets: [{
-          data: [247, 2, 1],
+          data: [
+            sensorCatalog.filter(sensor => sensor.status === 'online').length,
+            sensorCatalog.filter(sensor => sensor.status === 'warning').length,
+            sensorCatalog.filter(sensor => sensor.status === 'offline').length
+          ],
           backgroundColor: ['#20c997', '#f59f00', '#e03131'],
           borderWidth: 2,
           borderColor: '#060e1a'
@@ -2131,12 +2277,11 @@ function renderAssistant() {
   const selected = getSelectedLocation();
   const risk = riskScoreFromLocation(selected);
   const level = getEndRiskLabel(risk);
-  const confidence = Math.min(98, Math.round(72 + (selected.sensorStatus === 'warning' ? 12 : 8) + appState.phaseIndex * 3));
   const action = risk >= riskThresholds.CRITICAL.min ? 'Prepare evacuation readiness' : risk >= riskThresholds.HIGH.min ? 'Escalate monitoring posture' : 'Continue routine observation';
   document.getElementById('assistantContext').innerHTML = `
     <div><span>LIVE RISK</span><strong style="color:${getRiskColor(risk)}">${risk}% ${level}</strong></div>
-    <div><span>CONFIDENCE</span><strong>${confidence}%</strong></div>
-    <div><span>SOURCE</span><strong>${appState.telemetrySource === 'PYTHON GATEWAY' ? 'LIVE GATEWAY' : 'SIMULATION'}</strong></div>
+    <div><span>MODEL</span><strong>PROTOTYPE</strong></div>
+    <div><span>SOURCE</span><strong>${appState.telemetrySource === 'PYTHON GATEWAY' ? 'SIMULATED GATEWAY' : 'SIMULATION'}</strong></div>
   `;
   document.getElementById('assistantAnswers').innerHTML = `
     <strong>${action}</strong><br>Current risk in ${selected.name} is ${risk}% (${level}). ${selected.weather} and ${selected.slopeMovement} mm slope movement are shaping the recommendation.
@@ -2170,14 +2315,14 @@ function answerAssistantQuery(query) {
 
   // 2. Why is the risk high?
   if (normalized.includes('why') || normalized.includes('factor') || normalized.includes('high')) {
-    return `In <strong>${selected.name}</strong>, risk is driven by <strong>${selected.rainfall} mm/hr</strong> intense precipitation, soil saturation reaching <strong>${selected.soilMoisture}%</strong>, and slope vector displacement of <strong>${selected.slopeMovement} mm/hr</strong> under <em>${selected.weather}</em> conditions. Multi-layer sensor telemetry confirms shear strength degradation along active mountain fault lines.`;
+    return `In the demo record for <strong>${selected.name}</strong>, the weighted prototype score reflects rainfall (${selected.rainfall}), soil moisture (${selected.soilMoisture}%), and slope movement (${selected.slopeMovement}) under <em>${selected.weather}</em> conditions. These simulated inputs are illustrative signals, not a verified landslide forecast.`;
   }
 
   // 3. Rainfall data
   if (normalized.includes('rain') || normalized.includes('precipitation')) {
     const rain24 = appState.aiModel.rainfall24 || Math.round(selected.rainfall * 3.6);
     const rain72 = appState.aiModel.rainfall72 || Math.round(selected.rainfall * 7.4);
-    return `<strong>Precipitation Telemetry for ${selected.name}:</strong><br>• Current Intensity: <strong>${selected.rainfall} mm/hr</strong><br>• 24-Hour Cumulative: <strong>${rain24} mm</strong><br>• 72-Hour Cumulative: <strong>${rain72} mm</strong><br>Ground saturation index is at ${selected.soilMoisture}%, significantly exceeding baseline percolation limits.`;
+    return `<strong>Simulated precipitation values for ${selected.name}:</strong><br>• Current intensity: <strong>${selected.rainfall} mm/hr</strong><br>• Illustrative 24-hour value: <strong>${rain24} mm</strong><br>• Illustrative 72-hour value: <strong>${rain72} mm</strong><br>• Sample soil-moisture value: <strong>${selected.soilMoisture}%</strong><br>These figures are demo inputs, not verified telemetry or a forecast.`;
   }
 
   // 4. Critical zones
@@ -2186,19 +2331,19 @@ function answerAssistantQuery(query) {
       .map(l => ({ name: l.name, risk: riskScoreFromLocation(l), state: l.state, district: l.district }))
       .sort((a, b) => b.risk - a.risk);
     const top3 = sorted.slice(0, 3).map(z => `<strong>${z.name}</strong> (${z.district}, ${z.state}) at <span style="color:${getRiskColor(z.risk)}">${z.risk}%</span>`).join(', ');
-    return `<strong>Highest Vulnerability Zones:</strong> ${top3}. Priority response surveillance and early warning dispatches are currently focused on these mountain corridors.`;
+    return `<strong>Highest prototype-score zones in the demo:</strong> ${top3}. These sample rankings do not represent live monitoring or dispatched warnings.`;
   }
 
   // 5. Nearest safe zone
   if (normalized.includes('shelter') || normalized.includes('safe zone') || normalized.includes('nearest safe')) {
     const primary = selected.safeZones[0] || 'Designated High-Ground Assembly Point';
     const secondary = selected.safeZones[1] || 'District Sports Complex Emergency Shelter';
-    return `<strong>Designated Safe Havens for ${selected.name}:</strong><br>• Primary Haven: <strong>${primary}</strong> (Reinforced structural shelter on stable bedrock).<br>• Secondary Fallback: <strong>${secondary}</strong>.<br>Both zones have emergency medical caches, drinking water, and satellite communication links.`;
+    return `<strong>Safe-zone records in the demo for ${selected.name}:</strong><br>• Listed option: <strong>${primary}</strong><br>• Alternate listed option: <strong>${secondary}</strong><br>These entries are illustrative only. Confirm shelter availability and route safety with local authorities.`;
   }
 
   // 6. Routes to avoid
   if (normalized.includes('route') || normalized.includes('avoid') || normalized.includes('corridor')) {
-    return `<strong>Route Advisory for ${selected.name}:</strong><br>⚠ <strong>AVOID:</strong> Lower Cliffside Highway and cut-slope mountain bypasses due to high rockfall and mudslide hazards.<br>✓ <strong>RECOMMENDED:</strong> Use the <em>Upper Ridge Parkway Bypass</em> (Low-Risk Corridor). Check the <strong>Safe Route</strong> view for real-time corridor status and checkpoint milestones.`;
+    return `<strong>Prototype route comparison for ${selected.name}:</strong><br>Open <strong>Safe Route</strong> to compare the demo corridors and their simulated risk scores. The route graphic is illustrative and is not turn-by-turn navigation. Check current conditions and official advice before travelling.`;
   }
 
   // 7. Sensors online
@@ -2206,18 +2351,18 @@ function answerAssistantQuery(query) {
     const online = sensorCatalog.filter(s => s.status === 'online').length;
     const warning = sensorCatalog.filter(s => s.status === 'warning').length;
     const offline = sensorCatalog.filter(s => s.status === 'offline').length;
-    return `<strong>IoT Sensor Grid Overview:</strong> 250 telemetry nodes active across 8 North-Eastern states.<br>• Online (Normal): <strong>${online} nodes</strong> (98.8%)<br>• Warning (Elevated): <strong>${warning} nodes</strong><br>• Offline: <strong>${offline} node</strong><br>Data stream syncs every 8s via automated edge gateway telemetry.`;
+    return `<strong>Simulated sensor catalog:</strong> ${sensorCatalog.length} demo records for ${new Set(sensorCatalog.map(sensor => sensor.location)).size} monitored locations.<br>• Online in the sample: <strong>${online}</strong><br>• Warning in the sample: <strong>${warning}</strong><br>• Offline in the sample: <strong>${offline}</strong><br>These are prototype records, not a deployed physical IoT network.`;
   }
 
   // 8. Live Demo query
   if (normalized.includes('live demo') || normalized.includes('demo') || normalized.includes('what happened')) {
     const phase = phaseDefinitions[appState.phaseIndex] || phaseDefinitions[0];
-    return `<strong>Live Simulation Intelligence:</strong><br>Currently at <strong>${phase.label}</strong>.<br>• Monitored Zone: <strong>${selected.name}</strong> (${level} Risk, ${risk}%)<br>• Multi-Agency Sync: Weather telemetry, IoT sensor alarms, automated SMS/Radio broadcasts, and rescue team dispatches are coordinated across all dashboard views.`;
+    return `<strong>Demo simulation:</strong><br>Currently at <strong>${phase.label}</strong>.<br>• Demo zone: <strong>${selected.name}</strong> (${level} risk, ${risk}%)<br>• The scenario updates local dashboard views to illustrate an alert, response workflow, and route recalculation. No real authority or public notification is sent.`;
   }
 
   // 9. Report emergency / SOS
   if (normalized.includes('report') || normalized.includes('emergency') || normalized.includes('help') || normalized.includes('sos')) {
-    return `<strong>Emergency Response Protocol:</strong><br>1. Open the <strong>Citizen Safety</strong> tab or click <em>Emergency Help</em>.<br>2. Submit your exact location and incident type (Landslide Trapped / Road Blocked / Medical Need).<br>3. The incident is instantly logged in the <strong>Authority Response</strong> command desk with automated team dispatch (Alpha Rescue / SDRF).`;
+    return `<strong>Prototype emergency workflow:</strong><br>1. Open <strong>Citizen Safety</strong> and choose <em>I Need Help</em>.<br>2. Add a demo location and incident type.<br>3. The request is added to this browser’s simulated incident desk for an operator to review. No rescue team is actually dispatched.`;
   }
 
   // Precautions & General Safety
@@ -2233,7 +2378,7 @@ function buildAlertMessage() {
   const riskLevel = appState.communication.riskLevel || 'HIGH';
   const target = appState.communication.targetGroup || 'Villagers';
   const channel = appState.communication.channel || 'SMS';
-  const msg = `⚠ BHOOSHANKET EMERGENCY ALERT\n\nHigh landslide risk has been detected near ${loc}.\nPlease avoid vulnerable areas and follow instructions from authorities.\nRisk Level: ${riskLevel}.\nTarget Group: ${target}.\nChannel: ${channel}.`;
+  const msg = `⚠ BHOOSHANKET DEMO ADVISORY\n\nPrototype risk scenario for ${loc}.\nThis is simulated demo content. Verify conditions and follow local authority guidance.\nRisk Level: ${riskLevel}.\nTarget Group: ${target}.\nChannel: ${channel}.\nNo public message is sent by this prototype.`;
   appState.communication.message = msg;
   const messageBox = document.getElementById('commMessageBox');
   if (messageBox) messageBox.textContent = msg;
@@ -2441,6 +2586,9 @@ function initializeEvents() {
       navigateTo(item.dataset.view);
     });
   });
+  document.querySelectorAll('.mobile-tab[data-view]').forEach(item => {
+    item.addEventListener('click', () => navigateTo(item.dataset.view));
+  });
 
   document.getElementById('startDemoBtn').addEventListener('click', startLiveDemo);
 
@@ -2518,7 +2666,12 @@ function initializeEvents() {
   });
   document.getElementById('mapZoomReset')?.addEventListener('click', () => {
     appState.mapZoom = 1.0;
+    appState.mapPanX = 0;
+    appState.mapPanY = 0;
     renderMap();
+  });
+  document.querySelectorAll('[data-map-mode]').forEach(button => {
+    button.addEventListener('click', () => setMapMode(button.dataset.mapMode));
   });
 
   document.getElementById('runAiAnalysis').addEventListener('click', () => {
@@ -2732,9 +2885,15 @@ function initializeEvents() {
     const open = document.body.classList.toggle('nav-open');
     event.currentTarget.setAttribute('aria-expanded', String(open));
   });
+  document.getElementById('mobileMoreToggle')?.addEventListener('click', event => {
+    const open = document.body.classList.toggle('nav-open');
+    event.currentTarget.setAttribute('aria-expanded', String(open));
+    document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', String(open));
+  });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || !document.body.classList.contains('nav-open')) return;
     document.body.classList.remove('nav-open');
+    document.getElementById('mobileMoreToggle')?.setAttribute('aria-expanded', 'false');
     document.getElementById('sidebarToggle')?.setAttribute('aria-expanded', 'false');
     document.getElementById('sidebarToggle')?.focus();
   });
@@ -2907,10 +3066,21 @@ function bootSequence() {
 
 function startLiveDemo() {
   if (appState.liveDemoRunning) return;
+  if (appState.demoStepIndex >= phaseDefinitions.length) appState.resetDemo?.();
+  stopMapMonitor();
+  appState.mapMode = 'demo';
+  document.querySelectorAll('[data-map-mode]').forEach(button => {
+    const active = button.dataset.mapMode === 'demo';
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  const mapModeStatus = document.getElementById('mapModeStatus');
+  if (mapModeStatus) mapModeStatus.textContent = 'Live demo · simulated camera sequence';
   appState.liveDemoRunning = true;
   appState.reroutingActive = false;
   appState.reroutingStage = 0;
   appState.activeCorridor = 'safest';
+  document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
 
   const demoButton = document.getElementById('startDemoBtn');
   if (demoButton) demoButton.textContent = '● LIVE DEMO RUNNING';
@@ -2919,12 +3089,16 @@ function startLiveDemo() {
   const cycle = phaseDefinitions;
   const transitionLocations = [2, 4, 5, 5];
 
-  let i = 0;
-  appState.demoTimer = setInterval(() => {
+  let i = Math.max(0, Number(appState.demoStepIndex) || 0);
+  if (i >= cycle.length) {
+    i = 0;
+    appState.demoStepIndex = 0;
+  }
+  const advance = () => {
     if (i >= cycle.length) {
-      clearInterval(appState.demoTimer);
       appState.demoTimer = null;
       appState.liveDemoRunning = false;
+      appState.demoStepIndex = cycle.length;
       if (demoButton) demoButton.textContent = '▶ REPLAY LIVE DEMO';
       demoButton?.classList.remove('live');
       appState.phaseIndex = cycle.length - 1;
@@ -2960,7 +3134,7 @@ function startLiveDemo() {
     document.getElementById('notificationCenter').innerHTML = `
       <div class="notif-item">${phase.label}</div>
       <div class="notif-item">${selected.name} changed to ${level} risk</div>
-      <div class="notif-item">Authority response system synchronized</div>
+      <div class="notif-item">Local demo response view updated</div>
     `;
 
     // Phase 01 & 02: Normal to Elevated Baseline
@@ -3017,7 +3191,7 @@ function startLiveDemo() {
         appState.reroutingStage = 3; // 'SAFER ROUTE FOUND'
         appState.activeCorridor = 'alternative';
         renderRoute();
-        showToast('AI Safe Route resolved: Upper Ridge Parkway Bypass', 'success');
+        showToast('Prototype route comparison updated', 'success');
       }, 700);
 
       logCommand('CITIZEN', 'Critical warning synchronized', appState.citizenWarning, 'red');
@@ -3025,8 +3199,23 @@ function startLiveDemo() {
     }
 
     renderAll();
+    if (appState.activeView === 'map' && appState.mapMode === 'demo') requestAnimationFrame(() => focusMapOnLocation(selected));
     i += 1;
-  }, 1800);
+    appState.demoStepIndex = i;
+    appState.demoTimer = window.setTimeout(advance, 7600);
+  };
+  appState.demoTimer = window.setTimeout(advance, appState.demoSkipRequested ? 0 : 7600);
+  appState.demoSkipRequested = false;
+}
+
+function skipLiveDemo() {
+  if (!appState.liveDemoRunning) return;
+  window.clearTimeout(appState.demoTimer);
+  appState.demoTimer = null;
+  appState.demoStepIndex = phaseDefinitions.length - 1;
+  appState.demoSkipRequested = true;
+  appState.liveDemoRunning = false;
+  startLiveDemo();
 }
 
 function init() {
@@ -3058,7 +3247,7 @@ export {
   appState, simulationStore, locationCatalog, sensorCatalog, alertBank, incidentTableData,
   rescueTeams, safeZoneData, emergencyContacts, navigateTo, renderAll,
   renderCommandLog, showToast, logCommand, getSelectedLocation,
-  riskScoreFromLocation, getEndRiskLabel
+  riskScoreFromLocation, getEndRiskLabel, skipLiveDemo
 };
 
 init();

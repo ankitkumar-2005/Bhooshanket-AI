@@ -51,10 +51,10 @@
           <div class="login-satellite"><i></i><span></span><b></b></div>
           <div class="satellite-beam"></div>
           <div class="login-drone"><i></i><span></span><b></b></div>
-          <div class="login-signal-label label-satellite">SATELLITE LINK: ACTIVE</div>
-          <div class="login-signal-label label-sensors">SENSOR NETWORK: ONLINE</div>
+          <div class="login-signal-label label-satellite">GEOSPATIAL DEMO: READY</div>
+          <div class="login-signal-label label-sensors">SENSOR CATALOG: SIMULATED</div>
           <div class="login-signal-label label-model">AI RISK ENGINE: READY</div>
-          <div class="login-signal-label label-geo">GEOSPATIAL MODEL: ACTIVE</div>
+          <div class="login-signal-label label-geo">RISK MODEL: PROTOTYPE</div>
         </div>
         <div class="login-topline">
           <div class="login-brand" id="loginBrandMount"></div>
@@ -64,6 +64,7 @@
           <div class="brand-block">
             <div class="brand-tag login-kicker"><span class="kicker-dot"></span>PROTOTYPE AUTHENTICATION</div>
             <h1><span>BHOOSHANKET</span> <em>AI</em></h1>
+            <h2 class="login-product-headline">Predict disasters before they become emergencies.</h2>
             <div class="brand-subtitle">AI DISASTER INTELLIGENCE &amp; EMERGENCY RESPONSE PLATFORM</div>
             <p>
               Predict. Alert. Respond. Protect. Environmental signals become early warning,
@@ -79,6 +80,9 @@
             </div>
             <div class="risk-strip" aria-label="Prototype risk monitoring categories">
               <span><b>◒</b>FLOOD RISK</span><span><b>⌁</b>EARTHQUAKE</span><span class="risk-active"><b>△</b>LANDSLIDE</span><span><b>☼</b>WEATHER ALERT</span>
+            </div>
+            <div class="login-flow" aria-label="Disaster response workflow">
+              <span>ENVIRONMENT</span><i>→</i><span>PREDICT</span><i>→</i><span>WARN</span><i>→</i><span>RESPOND</span>
             </div>
           </div>
 
@@ -107,6 +111,8 @@
                 <span>Remember Me</span>
               </label>
               <button type="submit" class="primary-btn large login-submit"><span>→</span><b>SIGN IN</b></button>
+              <button type="button" class="secondary-btn demo-entry-btn" id="demoAccessBtn">EXPLORE THE SIMULATED COMMAND CENTER <span aria-hidden="true">↗</span></button>
+              <p class="auth-note demo-entry-note">Local prototype demo · simulated environmental and response data · no live public alerts</p>
               <div class="auth-links">
                 <button type="button" id="createAccount" class="text-link">Create an account</button>
                 <button type="button" id="forgotPasscode" class="text-link">Forgot Passcode</button>
@@ -215,9 +221,9 @@
             <div class="topbar-actions">
               <div class="live-status">
                 <span class="pulse"></span>
-                LIVE MONITORING
+                REGIONAL MONITOR
               </div>
-              <div class="sim-label">LIVE SIMULATION MODE</div>
+              <div class="sim-label">SIMULATED DEMO DATA</div>
               <div class="date-pill" id="dateStamp">—</div>
               <div class="clock-pill" id="clockStamp">—</div>
               <div class="notification-menu">
@@ -250,11 +256,26 @@
 
           <section class="view active" data-view-panel="dashboard">
             <div class="metrics-grid" id="metricsGrid"></div>
+            <section class="card response-flow-card" aria-labelledby="responseFlowTitle">
+              <div class="response-flow-intro">
+                <div class="eyebrow">ONE CONNECTED RESPONSE NETWORK</div>
+                <h3 id="responseFlowTitle">Predict. Alert. Respond. Protect.</h3>
+                <p>Follow a regional risk signal from environmental inputs through citizen safety.</p>
+              </div>
+              <div class="response-flow-steps" aria-label="Dashboard workflow">
+                <button type="button" data-goto="weather"><span>01</span><strong>Environment</strong><small>Weather · sensors</small></button><i aria-hidden="true">→</i>
+                <button type="button" data-goto="prediction"><span>02</span><strong>Predict</strong><small>Prototype risk model</small></button><i aria-hidden="true">→</i>
+                <button type="button" data-goto="alerts"><span>03</span><strong>Warn</strong><small>Simulated advisories</small></button><i aria-hidden="true">→</i>
+                <button type="button" data-goto="authority"><span>04</span><strong>Respond</strong><small>Incident workflow</small></button><i aria-hidden="true">→</i>
+                <button type="button" data-goto="rescue"><span>05</span><strong>Rescue</strong><small>Team coordination</small></button><i aria-hidden="true">→</i>
+                <button type="button" data-goto="citizen"><span>06</span><strong>Protect</strong><small>Citizen safety</small></button>
+              </div>
+            </section>
             <div class="content-grid dashboard-grid">
               <div class="card risk-card large-card">
                 <div class="card-header">
                   <div>
-                    <div class="eyebrow">CURRENT LANDSLIDE RISK</div>
+                    <div class="eyebrow">CURRENT PROTOTYPE LANDSLIDE RISK</div>
                     <h3 id="selectedLocationName">Shillong Monitoring Zone</h3>
                   </div>
                   <div class="location-selectors compact inline">
@@ -274,7 +295,7 @@
                       </div>
                     </div>
                     <div class="instrument-meta">
-                      <div><span>AI CONFIDENCE</span><strong id="aiConfidenceValue">94%</strong></div>
+                      <div><span>MODEL TYPE</span><strong id="aiConfidenceValue">PROTOTYPE</strong></div>
                       <div><span>REGION</span><strong id="regionIndicator">Meghalaya • Zone</strong></div>
                       <div><span>UPDATED</span><strong id="riskTimestamp">—</strong></div>
                     </div>
@@ -316,7 +337,7 @@
               <div class="card">
                 <div class="card-header split">
                   <div>
-                    <div class="eyebrow">LIVE INCIDENTS</div>
+                    <div class="eyebrow">SIMULATED INCIDENTS</div>
                     <h3>Incident Command Feed</h3>
                   </div>
                   <button type="button" class="action-btn" data-goto="alerts">ALERT CENTER</button>
@@ -326,7 +347,7 @@
               <div class="card">
                 <div class="card-header split">
                   <div>
-                    <div class="eyebrow">LIVE SENSOR TELEMETRY</div>
+                    <div class="eyebrow">SIMULATED SENSOR RECORDS</div>
                     <h3>Network Waveforms</h3>
                   </div>
                   <button type="button" class="action-btn" data-goto="sensors">SENSOR MONITORING</button>
@@ -373,7 +394,7 @@
               <div class="card-header split">
                 <div>
                   <div class="eyebrow">INTERACTIVE NORTH EAST INDIA RISK MAP</div>
-                  <h3>Live Risk Map</h3>
+              <h3>Disaster Intelligence Map</h3>
                 </div>
                 <div class="map-controls">
                   <input type="text" id="searchLocation" placeholder="Search location" />
@@ -407,6 +428,15 @@
                     <button type="button" class="icon-btn map-btn" id="mapZoomOut" title="Zoom Out" aria-label="Zoom Out">−</button>
                     <button type="button" class="icon-btn map-btn" id="mapZoomReset" title="Reset View" aria-label="Reset View">⊙</button>
                   </div>
+                </div>
+              </div>
+
+              <div class="map-mode-bar" role="group" aria-label="Map monitoring mode">
+                <div class="map-mode-copy"><strong>MAP MODE</strong><span id="mapModeStatus" aria-live="polite">Manual exploration · simulated regional map</span></div>
+                <div class="map-mode-actions">
+                  <button type="button" class="map-mode-btn active" data-map-mode="manual" aria-pressed="true">MANUAL</button>
+                  <button type="button" class="map-mode-btn" data-map-mode="monitor" aria-pressed="false">AUTO MONITOR</button>
+                  <button type="button" class="map-mode-btn" data-map-mode="demo" aria-pressed="false">LIVE DEMO</button>
                 </div>
               </div>
 
@@ -475,7 +505,7 @@
 
                 <div class="prediction-output">
                   <div class="ai-score-box">
-                    <span class="kicker">LANDSLIDE PROBABILITY</span>
+                    <span class="kicker">PROTOTYPE RISK SCORE</span>
                     <strong id="aiProbability">78%</strong>
                     <small id="aiRiskLabel">HIGH RISK</small>
                   </div>
@@ -489,7 +519,7 @@
                     <span>↓</span>
                     <span>AI RISK ENGINE</span>
                     <span>↓</span>
-                    <span>LANDSLIDE PROBABILITY</span>
+                    <span>PROTOTYPE RISK SCORE</span>
                     <span>↓</span>
                     <span>EARLY WARNING DECISION</span>
                   </div>
@@ -571,8 +601,8 @@
             <div class="card comm-card">
               <div class="card-header">
                 <div>
-                  <div class="eyebrow">EMERGENCY COMMUNICATION SYSTEM</div>
-                  <h3>Multi-Platform Alert Dispatch</h3>
+                  <div class="eyebrow">SIMULATED EMERGENCY COMMUNICATION</div>
+                  <h3>Alert Message Workflow</h3>
                 </div>
               </div>
 
@@ -841,12 +871,20 @@
       <i></i>
     </button>
 
+    <nav class="mobile-command-nav" aria-label="Quick command navigation">
+      <button type="button" class="mobile-tab" data-view="dashboard" aria-label="Overview"><span>◈</span><small>Home</small></button>
+      <button type="button" class="mobile-tab" data-view="map" aria-label="Risk map"><span>⌖</span><small>Map</small></button>
+      <button type="button" class="mobile-tab" data-view="prediction" aria-label="Risk intelligence"><span>✦</span><small>Risk</small></button>
+      <button type="button" class="mobile-tab" data-view="alerts" aria-label="Alerts"><span>⚑</span><small>Alerts</small></button>
+      <button type="button" class="mobile-tab" id="mobileMoreToggle" aria-label="Open more navigation" aria-expanded="false"><span>☰</span><small>More</small></button>
+    </nav>
+
     <div class="floating-assistant minimized" id="assistantBox" aria-label="BhooShanket Safety Assistant">
       <div class="assistant-header">
         <span class="assistant-dot"></span>
         <div>
-          <strong>BhooShanket Safety Assistant</strong>
-          <small>Operational response copilot</small>
+          <strong>BhooShanket Response Copilot</strong>
+          <small>Prototype answers from this demo’s data</small>
         </div>
         <div class="assistant-controls">
           <button type="button" id="assistantMinimize" aria-label="Minimize assistant">−</button>

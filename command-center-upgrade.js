@@ -1,10 +1,14 @@
 import {
   appState, locationCatalog, sensorCatalog, incidentTableData, alertBank,
-  navigateTo, renderAll, showToast, logCommand
+  navigateTo, renderAll, showToast, logCommand, skipLiveDemo
 } from './app.js';
 
 const initialLocations = new Map();
 let sensorObserver;
+let initialAlerts = [];
+let initialIncidents = [];
+let initialRescueTeams = [];
+let initialEmergencyRequests = [];
 
 function createButton(label, className = 'secondary-btn') {
   const button = document.createElement('button');
@@ -92,26 +96,51 @@ function pauseDemo() {
     showToast('No demo is currently running', 'info');
     return;
   }
-  clearInterval(appState.demoTimer);
+  clearTimeout(appState.demoTimer);
   appState.demoTimer = null;
   appState.liveDemoRunning = false;
+  document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
   const start = document.getElementById('startDemoBtn');
-  if (start) { start.textContent = '▶ RESTART LIVE DEMO'; start.classList.remove('live'); }
+  if (start) { start.textContent = '▶ RESUME LIVE DEMO'; start.classList.remove('live'); }
   logCommand('DEMO', 'Live demo paused', 'The synchronized simulation timeline was paused by the operator.', 'yellow');
   renderAudit();
-  showToast('Live demo paused. Restart will replay the full scenario.', 'info');
+  showToast('Live demo paused. Resume continues from this point.', 'info');
 }
 
 function resetDemo() {
-  clearInterval(appState.demoTimer);
+  clearTimeout(appState.demoTimer);
   appState.demoTimer = null;
   appState.liveDemoRunning = false;
+  document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
+  appState.demoStepIndex = 0;
+  appState.demoSkipRequested = false;
   appState.demoRiskOverride = null;
-  appState.phaseIndex = 2;
+  appState.phaseIndex = 0;
+  appState.selectedLocationId = 2;
+  appState.selectedSensorId = null;
+  appState.mapMode = 'manual';
+  appState.mapZoom = 1;
+  appState.mapPanX = 0;
+  appState.mapPanY = 0;
   appState.reroutingActive = false;
   appState.reroutingStage = 0;
   appState.activeCorridor = 'safest';
+  appState.routeStatus = 'READY';
+  appState.routeRisk = 'LOW';
+  appState.citizenWarning = '';
+  appState.communication.riskLevel = 'HIGH';
+  alertBank.splice(0, alertBank.length, ...structuredClone(initialAlerts));
+  incidentTableData.splice(0, incidentTableData.length, ...structuredClone(initialIncidents));
+  rescueTeams.splice(0, rescueTeams.length, ...structuredClone(initialRescueTeams));
+  appState.emergencyRequests.splice(0, appState.emergencyRequests.length, ...structuredClone(initialEmergencyRequests));
   initialLocations.forEach((snapshot, location) => Object.assign(location, structuredClone(snapshot)));
+  document.querySelectorAll('[data-map-mode]').forEach(button => {
+    const active = button.dataset.mapMode === 'manual';
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  const mapModeStatus = document.getElementById('mapModeStatus');
+  if (mapModeStatus) mapModeStatus.textContent = 'Manual exploration · simulated regional map';
   const start = document.getElementById('startDemoBtn');
   if (start) { start.textContent = '▶ START LIVE DEMO'; start.classList.remove('live'); }
   logCommand('DEMO', 'Live demo reset', 'Simulation restored to the current monitored regional baseline.', 'blue');
@@ -127,10 +156,16 @@ function addDemoControls() {
   controls.id = 'demoControls';
   controls.className = 'demo-controls';
   const pause = createButton('Ⅱ PAUSE');
+  const skip = createButton('SKIP →');
   const reset = createButton('↺ RESET');
   pause.addEventListener('click', pauseDemo);
+  skip.addEventListener('click', () => {
+    if (!appState.liveDemoRunning) return showToast('Start the demo before skipping ahead.', 'info');
+    skipLiveDemo();
+    showToast('Skipping to the critical response phase.', 'warning');
+  });
   reset.addEventListener('click', resetDemo);
-  controls.append(pause, reset);
+  controls.append(pause, skip, reset);
   start.after(controls);
 }
 
@@ -138,13 +173,15 @@ function renderPhaseTracker() {
   const tracker = document.getElementById('liveDemoTracker');
   if (!tracker) return;
   const phaseIndex = Math.max(0, Math.min(3, appState.phaseIndex || 0));
-  const phase = ['NORMAL', 'WARNING', 'HIGH RISK', 'CRITICAL'][phaseIndex];
+  const phase = appState.liveDemoRunning
+    ? ['NORMAL', 'WARNING', 'HIGH RISK', 'CRITICAL'][phaseIndex]
+    : appState.demoStepIndex === 0 ? 'BASELINE' : appState.demoStepIndex >= 4 ? 'SCENARIO COMPLETE' : 'PAUSED';
   const location = locationCatalog.find(item => item.id === appState.selectedLocationId) || locationCatalog[1];
   const risk = appState.demoRiskOverride ?? location.risk;
   tracker.innerHTML = `
-    <div class="demo-phase-head"><span>LIVE DEMO TRACKER</span><strong>PHASE ${String(phaseIndex + 1).padStart(2, '0')} / 04 · ${phase}</strong></div>
+    <div class="demo-phase-head"><span>DEMO SIMULATION</span><strong>${appState.liveDemoRunning ? `PHASE ${String(phaseIndex + 1).padStart(2, '0')} / 04` : 'CURRENT BASELINE'} · ${phase}</strong></div>
     <div class="demo-phase-stats"><div><small>RISK</small><b>${risk}%</b></div><div><small>RAINFALL</small><b>${location.rainfall} mm/hr</b></div><div><small>SOIL MOISTURE</small><b>${location.soilMoisture}%</b></div><div><small>SLOPE MOVEMENT</small><b>${location.slopeMovement} mm</b></div></div>
-    <div class="demo-phase-progress" aria-label="Live demo phase ${phaseIndex + 1} of 4"><i style="width:${(phaseIndex + 1) * 25}%"></i></div>`;
+    <div class="demo-phase-progress" aria-label="${appState.liveDemoRunning ? `Live demo phase ${phaseIndex + 1} of 4` : 'Current baseline'}"><i style="width:${appState.liveDemoRunning ? (phaseIndex + 1) * 25 : 0}%"></i></div>`;
 }
 
 function addPhaseTracker() {
@@ -168,6 +205,11 @@ export function installCommandCenterUpgrade() {
   addPhaseTracker();
   renderAudit();
   document.addEventListener('bhooshanket:simulation-rendered', renderPhaseTracker);
+  initialAlerts = structuredClone(alertBank);
+  initialIncidents = structuredClone(incidentTableData);
+  initialRescueTeams = structuredClone(rescueTeams);
+  initialEmergencyRequests = structuredClone(appState.emergencyRequests);
+  appState.resetDemo = resetDemo;
   document.addEventListener('click', event => {
     if (event.target.closest('[data-view="audit"]')) renderAudit();
   });
