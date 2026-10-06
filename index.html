@@ -15,17 +15,17 @@
     <div class="boot-overlay hidden" id="bootOverlay" role="dialog" aria-modal="true" aria-label="System Initializing">
       <div class="boot-panel">
         <div class="boot-logo-mount" id="bootLogoMount"></div>
-        <div class="boot-kicker">SYSTEM INITIALIZING</div>
-        <h1>COMMAND NETWORK</h1>
-        <p id="bootStatus">SYNCHRONIZING GEOSPATIAL TELEMETRY...</p>
+        <div class="boot-kicker">BHOOSHANKET AI · DISASTER INTELLIGENCE NETWORK</div>
+        <h1>SYSTEM INITIALIZING</h1>
+        <p id="bootStatus">PREPARING SIMULATED COMMAND ENVIRONMENT...</p>
         <ul class="boot-systems" id="bootSystems">
-          <li>ENVIRONMENTAL SENSORS ONLINE</li>
-          <li>AI RISK ENGINE ONLINE</li>
-          <li>GEOSPATIAL INTELLIGENCE ONLINE</li>
-          <li>EMERGENCY NETWORK READY</li>
-          <li>RESPONSE COORDINATION READY</li>
+          <li>ENVIRONMENTAL SAMPLE INPUTS</li>
+          <li>PROTOTYPE WEIGHTED RISK MODEL</li>
+          <li>ILLUSTRATIVE GEOSPATIAL VIEW</li>
+          <li>SIMULATED WARNING WORKFLOW</li>
+          <li>LOCAL RESPONSE DEMO READY</li>
         </ul>
-        <button type="button" class="primary-btn compact" id="skipBootBtn">ENTER COMMAND CENTER →</button>
+        <button type="button" class="primary-btn compact" id="skipBootBtn">SKIP INTRO · ENTER COMMAND CENTER →</button>
       </div>
     </div>
 
@@ -162,6 +162,34 @@
             </section>
           </div>
         </div>
+        <section class="landing-story problem-story" aria-labelledby="problemStoryTitle">
+          <div class="story-heading story-reveal" data-story-reveal>
+            <div class="eyebrow">THE RESPONSE GAP</div>
+            <h2 id="problemStoryTitle">Disasters don't wait. Response shouldn't either.</h2>
+            <p>When warning signals and response context are separated, teams and communities lose time.</p>
+          </div>
+          <div class="problem-grid">
+            <article class="problem-card story-reveal" data-story-reveal><span>01 · DETECT</span><h3>Late detection</h3><p>Risk can build before a clear warning reaches the people who need it.</p></article>
+            <article class="problem-card story-reveal" data-story-reveal><span>02 · CONNECT</span><h3>Fragmented signals</h3><p>Weather, terrain, and incident context may sit in separate views.</p></article>
+            <article class="problem-card story-reveal" data-story-reveal><span>03 · COORDINATE</span><h3>Slow coordination</h3><p>Response teams need a shared picture of zones, alerts, and routes.</p></article>
+            <article class="problem-card story-reveal" data-story-reveal><span>04 · GUIDE</span><h3>Citizen uncertainty</h3><p>People need understandable safety information and next steps.</p></article>
+          </div>
+        </section>
+        <section class="landing-story how-story" id="landingHowItWorks" aria-labelledby="howStoryTitle">
+          <div class="story-heading story-reveal" data-story-reveal>
+            <div class="eyebrow">HOW BHOOSHANKET WORKS</div>
+            <h2 id="howStoryTitle">One intelligence layer. One response network.</h2>
+            <p>A connected prototype flow demonstrates how environmental context can inform a coordinated response.</p>
+          </div>
+          <ol class="story-pipeline" aria-label="BhooShanket prototype flow">
+            <li class="story-pipeline-step story-reveal" data-story-reveal><span>01</span><strong>Environmental inputs</strong><small>Weather and sample sensor readings</small></li>
+            <li class="story-pipeline-step story-reveal" data-story-reveal><span>02</span><strong>Geospatial context</strong><small>Illustrative zones and terrain view</small></li>
+            <li class="story-pipeline-step story-reveal" data-story-reveal><span>03</span><strong>Prototype risk score</strong><small>Transparent weighted calculation</small></li>
+            <li class="story-pipeline-step story-reveal" data-story-reveal><span>04</span><strong>Warning workflow</strong><small>Local simulated alert and review</small></li>
+            <li class="story-pipeline-step story-reveal" data-story-reveal><span>05</span><strong>Safety actions</strong><small>Response views and route comparison</small></li>
+          </ol>
+          <p class="story-disclosure">Prototype demonstration · data, warnings, and response actions are simulated.</p>
+        </section>
       </div>
 
       <div class="app-shell hidden" id="appShell">
@@ -416,12 +444,15 @@
                   <select id="mapLayerFilter">
                     <option value="standard">STANDARD</option>
                     <option value="terrain">TERRAIN &amp; TOPOGRAPHY</option>
-                    <option value="heatmap">LANDSLIDE RISK HEATMAP</option>
-                    <option value="sensors">SENSOR NETWORK</option>
-                    <option value="rainfall">RAINFALL RADAR</option>
-                    <option value="slope">SLOPE MOVEMENT VECTORS</option>
-                    <option value="safe">SAFE ZONES &amp; SHELTERS</option>
-                    <option value="incidents">ACTIVE INCIDENTS &amp; RESCUE</option>
+                    <option value="landslide">LANDSLIDE RISK · PROTOTYPE</option>
+                    <option value="sensors">SENSOR RECORDS · SIMULATED</option>
+                    <option value="rainfall">RAINFALL INPUTS</option>
+                    <option value="flood">FLOOD CONTEXT · RAINFALL ONLY</option>
+                    <option value="earthquake">EARTHQUAKE EVENTS</option>
+                    <option value="slope">SLOPE MOVEMENT INPUTS</option>
+                    <option value="safe">SAFE ZONE RECORDS</option>
+                    <option value="teams">RESPONSE TEAM RECORDS</option>
+                    <option value="incidents">SIMULATED INCIDENTS</option>
                   </select>
                   <div class="map-zoom-tools">
                     <button type="button" class="icon-btn map-btn" id="mapZoomIn" title="Zoom In" aria-label="Zoom In">+</button>
@@ -441,7 +472,7 @@
               </div>
 
               <div class="map-layout">
-                <div class="map-viewport" id="mapViewport"></div>
+                <div class="map-viewport" id="mapViewport" role="region" tabindex="0" aria-label="Illustrative disaster intelligence map. Drag to pan, use arrow keys to pan, and plus or minus to zoom."></div>
                 <aside class="intel-panel" id="mapInfoPanel"></aside>
               </div>
             </div>

@@ -27,6 +27,11 @@ const appState = {
   mapMode: 'manual',
   mapMonitorTimer: null,
   demoStepIndex: 0,
+  demoResponseStage: 0,
+  demoPaused: false,
+  demoPausedRemaining: null,
+  demoNextStepAt: null,
+  demoRouteTimer: null,
   activeCorridor: 'safest',
   reroutingActive: false,
   reroutingStage: 0,
@@ -82,6 +87,7 @@ const appState = {
   annotations: [],
   telemetrySource: 'LOCAL SIMULATION',
   telemetryLastSync: null,
+  telemetrySnapshots: {},
   commandEvents: [
     { time: '05:42', type: 'SYSTEM', title: 'Prototype monitoring initialized', detail: 'Eight simulated sensor records are available across the demo region.', tone: 'blue' },
     { time: '05:48', type: 'SENSOR', title: 'Rainfall threshold crossed', detail: 'Shillong rain sensor RS-104 moved into elevated observation.', tone: 'yellow' },
@@ -537,18 +543,76 @@ function showCriticalEvent(location, risk) {
   const overlay = document.getElementById('cinematicOverlay');
   const card = document.getElementById('cinematicCard');
   if (!overlay || !card) return;
+  const responseStages = [
+    'AI ALERT GENERATED · LOCAL DEMO',
+    'AUTHORITY NOTIFICATION · SIMULATED',
+    'SAFER ROUTE · RECALCULATED',
+    'RESCUE TEAM · ASSIGNMENT SIMULATED'
+  ];
   card.innerHTML = `
     <div class="cinematic-kicker">DEMO SIMULATION · RESPONSE WORKFLOW</div>
     <h2>CRITICAL RISK SCENARIO</h2>
     <div class="cinematic-location">${location.name.toUpperCase()} <span>•</span> ${location.district.toUpperCase()}</div>
-    <div class="cinematic-risk"><strong>${risk}%</strong><span>AI RISK PROBABILITY</span></div>
-    <div class="cinematic-flow">
-      <span>AUTHORITY STEP SIMULATED</span><i></i><span>TEAM ASSIGNMENT SIMULATED</span><i></i><span>PUBLIC ALERT NOT SENT</span><i></i><span>DEMO ROUTE UPDATED</span>
-    </div>
+    <div class="cinematic-risk"><strong>${risk}%</strong><span>PROTOTYPE RISK SCORE</span></div>
+    <ol class="cinematic-flow" aria-label="Simulated response stages">${responseStages.map((stage, index) => `<li data-response-stage="${index}"${index === 0 ? ' aria-current="step"' : ''}><span>${String(index + 1).padStart(2, '0')}</span><strong>${stage}</strong></li>`).join('')}</ol>
+    <p class="cinematic-disclosure">No public warning is sent and no field team is dispatched by this prototype.</p>
   `;
   overlay.classList.remove('hidden');
   clearTimeout(showCriticalEvent.timer);
-  showCriticalEvent.timer = setTimeout(() => overlay.classList.add('hidden'), 3600);
+  showCriticalEvent.timer = null;
+  (showCriticalEvent.stageTimers || []).forEach(clearTimeout);
+  showCriticalEvent.stageTimers = [];
+  showCriticalEvent.active = true;
+  showCriticalEvent.paused = false;
+  const updateStage = stageIndex => {
+    appState.demoResponseStage = stageIndex;
+    card.querySelectorAll('[data-response-stage]').forEach((item, index) => {
+      item.classList.toggle('complete', index < stageIndex);
+      item.classList.toggle('active', index === stageIndex);
+      if (index === stageIndex) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+  };
+  const clearStageTimers = () => {
+    showCriticalEvent.stageTimers.forEach(clearTimeout);
+    showCriticalEvent.stageTimers = [];
+    clearTimeout(showCriticalEvent.timer);
+    showCriticalEvent.timer = null;
+  };
+  const scheduleNextStage = () => {
+    if (!showCriticalEvent.active || showCriticalEvent.paused) return;
+    if (appState.demoResponseStage < responseStages.length - 1) {
+      const nextStage = appState.demoResponseStage + 1;
+      showCriticalEvent.stageTimers.push(setTimeout(() => {
+        updateStage(nextStage);
+        scheduleNextStage();
+      }, 900));
+      return;
+    }
+    showCriticalEvent.timer = setTimeout(() => {
+      overlay.classList.add('hidden');
+      showCriticalEvent.active = false;
+      showCriticalEvent.timer = null;
+    }, 900);
+  };
+  appState.pauseCriticalEvent = () => {
+    if (!showCriticalEvent.active) return;
+    showCriticalEvent.paused = true;
+    clearStageTimers();
+  };
+  appState.resumeCriticalEvent = () => {
+    if (!showCriticalEvent.active || !showCriticalEvent.paused) return;
+    showCriticalEvent.paused = false;
+    scheduleNextStage();
+  };
+  appState.clearCriticalEvent = () => {
+    clearStageTimers();
+    showCriticalEvent.active = false;
+    showCriticalEvent.paused = false;
+    overlay.classList.add('hidden');
+  };
+  updateStage(0);
+  scheduleNextStage();
 }
 
 function openDrawer(html) {
@@ -642,6 +706,11 @@ async function syncExternalTelemetry() {
     if (!response.ok) throw new Error('Gateway unavailable');
     const payload = await response.json();
     const readings = payload.readings || {};
+    const previousReadings = appState.telemetrySnapshots[selected.id] || {
+      rainfall: selected.rainfall,
+      soilMoisture: selected.soilMoisture,
+      slopeMovement: selected.slopeMovement
+    };
     selected.rainfall = readings.rainfall ?? selected.rainfall;
     selected.soilMoisture = readings.soilMoisture ?? selected.soilMoisture;
     selected.slopeMovement = readings.slopeMovement ?? selected.slopeMovement;
@@ -649,10 +718,21 @@ async function syncExternalTelemetry() {
     selected.temperature = readings.temperature ?? selected.temperature;
     appState.telemetrySource = 'PYTHON GATEWAY';
     appState.telemetryLastSync = payload.timestamp;
+    const currentReadings = { rainfall: selected.rainfall, soilMoisture: selected.soilMoisture, slopeMovement: selected.slopeMovement };
+    const significantChange = Math.abs(currentReadings.rainfall - previousReadings.rainfall) >= 12
+      || Math.abs(currentReadings.soilMoisture - previousReadings.soilMoisture) >= 8
+      || Math.abs(currentReadings.slopeMovement - previousReadings.slopeMovement) >= 8;
+    appState.telemetrySnapshots[selected.id] = currentReadings;
     renderRiskOverview();
     renderWeather();
     renderMap();
     renderNotifications();
+    if (appState.mapMode === 'monitor' && appState.activeView === 'map' && significantChange) {
+      const modeStatus = document.getElementById('mapModeStatus');
+      if (modeStatus) modeStatus.textContent = 'Significant sample change detected · focusing this zone';
+      requestAnimationFrame(() => focusMapOnLocation(selected));
+      logCommand('MAP', 'Priority zone input changed', `${selected.name} · significant illustrative telemetry change.`, 'orange');
+    }
   } catch (error) {
     appState.telemetrySource = 'LOCAL SIMULATION';
   }
@@ -1368,11 +1448,14 @@ function renderMap() {
   });
 
   // Layer-specific SVG elements
-  const showHeatmap = activeLayer === 'heatmap';
+  const showHeatmap = activeLayer === 'heatmap' || activeLayer === 'landslide';
   const showSensors = activeLayer === 'sensors';
   const showRainfall = activeLayer === 'rainfall';
+  const showFloodContext = activeLayer === 'flood';
+  const showEarthquakeEvents = activeLayer === 'earthquake';
   const showSlope = activeLayer === 'slope';
   const showSafe = activeLayer === 'safe';
+  const showTeams = activeLayer === 'teams';
   const showIncidents = activeLayer === 'incidents';
   const showTerrain = activeLayer === 'terrain' || activeLayer === 'standard';
 
@@ -1386,21 +1469,21 @@ function renderMap() {
   }).join('') : '';
 
   // Rainfall Radar Grid Overlay
-  const rainfallSvg = showRainfall ? `
-    <g class="map-rainfall-layer" opacity="0.65">
-      <defs>
-        <pattern id="radarGrid" width="30" height="30" patternUnits="userSpaceOnUse">
-          <rect width="30" height="30" fill="none" stroke="rgba(66, 196, 255, 0.14)" stroke-width="0.8" />
-          <circle cx="15" cy="15" r="2" fill="rgba(66, 196, 255, 0.3)" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#radarGrid)" />
-      <circle cx="48%" cy="32%" r="120" fill="rgba(66, 196, 255, 0.18)" filter="url(#mapBlur)" />
-      <circle cx="81%" cy="30%" r="90" fill="rgba(255, 77, 95, 0.2)" filter="url(#mapBlur)" />
-      <text x="48%" y="24%" fill="#6be3ff" font-size="11" font-family="'IBM Plex Mono', monospace">PRECIPITATION BAND: 82 mm/hr</text>
-      <text x="81%" y="22%" fill="#ff7b8a" font-size="11" font-family="'IBM Plex Mono', monospace">CLOUDBURST ANOMALY: 96 mm/hr</text>
+  const rainfallSvg = showRainfall ? filteredLocations.map(loc => `
+    <g class="map-rainfall-sample">
+      <circle cx="${loc.mapX}%" cy="${loc.mapY}%" r="${Math.max(20, Math.min(58, loc.rainfall * 0.48))}" fill="#45b9ef" opacity="0.16" filter="url(#mapBlur)" />
+      <circle cx="${loc.mapX}%" cy="${loc.mapY}%" r="${Math.max(16, Math.min(42, loc.rainfall * 0.34))}" fill="none" stroke="#6bd8ff" stroke-width="1.4" opacity="0.7" />
+      <text x="${loc.mapX}%" y="${loc.mapY}%" dy="-14" fill="#9fe8ff" font-size="10" font-family="'IBM Plex Mono', monospace" text-anchor="middle">SAMPLE ${loc.rainfall} mm/hr</text>
     </g>
-  ` : '';
+  `).join('') : '';
+
+  const floodContextSvg = showFloodContext ? filteredLocations.map(loc => `
+    <g class="map-flood-context">
+      <circle cx="${loc.mapX}%" cy="${loc.mapY}%" r="${Math.max(20, Math.min(60, loc.rainfall * 0.52))}" fill="#399ac7" opacity="0.18" filter="url(#mapBlur)" />
+      <circle cx="${loc.mapX}%" cy="${loc.mapY}%" r="${Math.max(18, Math.min(46, loc.rainfall * 0.38))}" fill="none" stroke="#59c8f4" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.72" />
+      <text x="${loc.mapX}%" y="${loc.mapY}%" dy="-13" fill="#a9eaff" font-size="9" font-family="'IBM Plex Mono', monospace" text-anchor="middle">RAINFALL INPUT</text>
+    </g>
+  `).join('') : '';
 
   // Slope Displacement Vectors
   const slopeVectorsSvg = showSlope ? filteredLocations.map(loc => {
@@ -1477,23 +1560,36 @@ function renderMap() {
     const location = locationCatalog.find(item => item.name === sensor.location);
     if (!location) return '';
     const offset = (index % 4) * 2.2;
-    return `<button type="button" class="sensor-map-marker" data-sensor-id="${sensor.id}" style="left:calc(${location.mapX}% + ${offset}px);top:calc(${location.mapY}% + ${(index % 3) * 10 - 14}px)" aria-label="Inspect simulated sensor ${sensor.id}, ${sensor.name}"><span aria-hidden="true">⌁</span></button>`;
+    const selectedSensor = appState.selectedSensorId === sensor.id;
+    return `<button type="button" class="sensor-map-marker${selectedSensor ? ' selected' : ''}" data-sensor-id="${sensor.id}" style="left:calc(${location.mapX}% + ${offset}px);top:calc(${location.mapY}% + ${(index % 3) * 10 - 14}px)" aria-label="Inspect simulated sensor ${sensor.id}, ${sensor.name}" aria-pressed="${selectedSensor}"><span aria-hidden="true">⌁</span></button>`;
+  }).join('') : '';
+
+  const teamsSvg = showTeams ? rescueTeams.map((team, index) => {
+    const location = locationCatalog.find(item => item.name === team.location);
+    if (!location) return '';
+    const offsetY = index % 2 === 0 ? 19 : -19;
+    const label = team.team.replace(' Response Unit', ' Unit').replace(' Rescue Team', ' Team');
+    return `<g class="map-team-marker" transform="translate(${location.mapX * 10 + 20}, ${location.mapY * 7 + offsetY})"><circle r="12" fill="#0a2638" stroke="#6bd8ff" stroke-width="1.6"/><text y="4" text-anchor="middle" fill="#b7edff" font-size="11" font-family="'IBM Plex Mono', monospace">R</text><text x="16" y="4" fill="#d5f3ff" font-size="9" font-family="'IBM Plex Mono', monospace">${label.toUpperCase()} · SIMULATED</text></g>`;
   }).join('') : '';
 
   mapViewport.innerHTML = `
     <div class="map-telemetry">
       <span>SIMULATED REGIONAL MAP</span>
-      <strong>${selected.name.toUpperCase()} • ${riskScoreFromLocation(selected)}% ${getEndRiskLabel(riskScoreFromLocation(selected))}</strong>
+      <strong>${selected.name.toUpperCase()} • ${riskScoreFromLocation(selected)}% ${getEndRiskLabel(riskScoreFromLocation(selected))} DEMO SCORE</strong>
     </div>
 
     <div class="map-badge">${selected.state.toUpperCase()} <i>›</i> ${selected.district.toUpperCase()}</div>
 
     <div class="map-legend">
-      <span><i class="legend-dot risk"></i>Risk Signal</span>
-      <span><i class="legend-dot route"></i>Safe Corridor</span>
-      <span><i class="legend-dot safe"></i>Safe Zone</span>
-      <span><i class="legend-dot" style="background:var(--blue);"></i>IoT Sensors</span>
+      <span><i class="legend-dot risk"></i>Prototype score</span>
+      <span><i class="legend-dot route"></i>Illustrative route</span>
+      ${showSensors ? '<span><i class="legend-dot" style="background:var(--blue);"></i>Sensor records</span>' : ''}
+      ${showSafe ? '<span><i class="legend-dot safe"></i>Safe-zone records</span>' : ''}
+      ${showTeams ? '<span><i class="legend-dot" style="background:var(--blue);"></i>Simulated teams</span>' : ''}
     </div>
+
+    ${showFloodContext ? '<div class="map-layer-note">RAINFALL CONTEXT ONLY · NOT A FLOOD FORECAST</div>' : ''}
+    ${showEarthquakeEvents ? '<div class="map-layer-note">EARTHQUAKE EVENT LAYER · NO SAMPLE EVENTS IN THIS DEMO</div>' : ''}
 
     <div class="map-radar-sweep-beam"></div>
 
@@ -1523,7 +1619,7 @@ function renderMap() {
         />
 
         <!-- Topographic Ridge Elevation Bands -->
-        <g class="map-layer-terrain" opacity="0.6">
+        <g class="map-layer-terrain ${showTerrain ? 'terrain-visible' : ''}" opacity="0.6">
           <path d="M 140,190 Q 300,140 500,120 T 820,170" stroke="rgba(66, 196, 255, 0.22)" stroke-width="1.4" fill="none" />
           <path d="M 160,250 Q 320,190 530,170 T 800,230" stroke="rgba(66, 196, 255, 0.18)" stroke-width="1.4" fill="none" />
           <path d="M 200,320 Q 360,260 560,240 T 780,310" stroke="rgba(66, 196, 255, 0.15)" stroke-width="1.2" fill="none" />
@@ -1555,9 +1651,11 @@ function renderMap() {
 
         ${heatmapSvg}
         ${rainfallSvg}
+        ${floodContextSvg}
         ${slopeVectorsSvg}
         ${safeSheltersSvg}
         ${incidentsSvg}
+        ${teamsSvg}
       </svg>
 
       <!-- Active Marker Overlay -->
@@ -1590,7 +1688,7 @@ function renderMap() {
         <div class="tooltip-grid">
           <span>State: <strong>${loc.state}</strong></span>
           <span>District: <strong>${loc.district}</strong></span>
-          <span>Risk Probability: <strong style="color:${getRiskColor(risk)}">${risk}% (${level})</strong></span>
+          <span>Prototype weighted score: <strong style="color:${getRiskColor(risk)}">${risk}% (${level})</strong></span>
           <span>Rainfall: <strong>${loc.rainfall} mm/hr</strong></span>
           <span>Soil Moisture: <strong>${loc.soilMoisture}%</strong></span>
           <span>Slope Movement: <strong>${loc.slopeMovement} mm/hr</strong></span>
@@ -1618,6 +1716,11 @@ function renderMap() {
   mapViewport.querySelectorAll('[data-sensor-id]').forEach(button => {
     button.addEventListener('click', event => {
       event.stopPropagation();
+      mapViewport.querySelectorAll('[data-sensor-id]').forEach(marker => {
+        const active = marker === button;
+        marker.classList.toggle('selected', active);
+        marker.setAttribute('aria-pressed', String(active));
+      });
       appState.selectedSensorId = button.dataset.sensorId;
       const sensor = sensorCatalog.find(item => item.id === appState.selectedSensorId);
       const location = locationCatalog.find(item => item.name === sensor?.location);
@@ -1643,6 +1746,21 @@ function renderMap() {
   const endPan = () => { drag = null; mapViewport.classList.remove('is-panning'); };
   mapViewport.onpointerup = endPan;
   mapViewport.onpointercancel = endPan;
+  mapViewport.onlostpointercapture = endPan;
+  mapViewport.onkeydown = event => {
+    if (event.target !== mapViewport) return;
+    const panStep = 44;
+    if (event.key === 'ArrowLeft') appState.mapPanX += panStep;
+    else if (event.key === 'ArrowRight') appState.mapPanX -= panStep;
+    else if (event.key === 'ArrowUp') appState.mapPanY += panStep;
+    else if (event.key === 'ArrowDown') appState.mapPanY -= panStep;
+    else if (event.key === '+' || event.key === '=') appState.mapZoom = Math.min(2.5, Number(((appState.mapZoom || 1) + 0.15).toFixed(2)));
+    else if (event.key === '-' || event.key === '_') appState.mapZoom = Math.max(0.75, Number(((appState.mapZoom || 1) - 0.15).toFixed(2)));
+    else if (event.key === 'Home') { appState.mapZoom = 1; appState.mapPanX = 0; appState.mapPanY = 0; }
+    else return;
+    event.preventDefault();
+    stage.style.transform = `translate(${appState.mapPanX}px, ${appState.mapPanY}px) scale(${appState.mapZoom})`;
+  };
 
   renderMapInfoPanel();
 }
@@ -1653,8 +1771,8 @@ function focusMapOnLocation(location) {
   if (!viewport || !stage || !location) return;
   const scale = Math.max(1.35, appState.mapZoom || 1);
   appState.mapZoom = scale;
-  appState.mapPanX = -((location.mapX / 100) - 0.5) * viewport.clientWidth * scale;
-  appState.mapPanY = -((location.mapY / 100) - 0.5) * viewport.clientHeight * scale;
+  appState.mapPanX = viewport.clientWidth * (0.5 - (location.mapX / 100) * scale);
+  appState.mapPanY = viewport.clientHeight * (0.5 - (location.mapY / 100) * scale);
   stage.style.transform = `translate(${appState.mapPanX}px, ${appState.mapPanY}px) scale(${scale})`;
 }
 
@@ -1673,7 +1791,7 @@ function setMapMode(mode) {
   });
   const status = document.getElementById('mapModeStatus');
   if (status) status.textContent = mode === 'monitor'
-    ? 'Auto monitor · simulated priority zones'
+    ? 'Auto monitor · fixed on highest-priority sample; moves on significant input change'
     : mode === 'demo' ? 'Live demo · simulated camera sequence' : 'Manual exploration · simulated regional map';
   const viewport = document.getElementById('mapViewport');
   if (mode === 'manual') {
@@ -1691,20 +1809,14 @@ function setMapMode(mode) {
     return;
   }
   navigateTo('map');
-  const candidates = [...locationCatalog].filter(location => riskScoreFromLocation(location) >= riskThresholds.HIGH.min);
-  let index = 0;
-  const visitNextPriorityZone = () => {
-    if (appState.mapMode !== 'monitor' || !candidates.length) return;
-    const location = candidates[index % candidates.length];
-    index += 1;
-    appState.selectedLocationId = location.id;
-    appState.demoRiskOverride = null;
-    renderAll();
-    requestAnimationFrame(() => focusMapOnLocation(location));
-    logCommand('MAP', 'Priority zone in view', `${location.name} · ${riskScoreFromLocation(location)}% simulated risk.`, 'orange');
-  };
-  visitNextPriorityZone();
-  appState.mapMonitorTimer = window.setInterval(visitNextPriorityZone, 9000);
+  appState.demoRiskOverride = null;
+  const location = [...locationCatalog].sort((a, b) => riskScoreFromLocation(b) - riskScoreFromLocation(a))[0];
+  if (!location) return;
+  appState.selectedLocationId = location.id;
+  appState.selectedSensorId = null;
+  renderAll();
+  requestAnimationFrame(() => focusMapOnLocation(location));
+  logCommand('MAP', 'Auto monitor focused priority zone', `${location.name} · ${riskScoreFromLocation(location)}% prototype weighted score. Camera will wait for a significant input change.`, 'orange');
 }
 
 function renderMapInfoPanel() {
@@ -1731,7 +1843,7 @@ function renderMapInfoPanel() {
     `;
     document.getElementById('showSelectedZone')?.addEventListener('click', () => {
       appState.selectedSensorId = null;
-      renderMapInfoPanel();
+      renderMap();
     });
     return;
   }
@@ -3036,15 +3148,20 @@ function bootSequence() {
   }
 
   if (!overlay) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    sessionStorage.setItem('bhooshanket_booted', 'true');
+    overlay.remove();
+    return;
+  }
   overlay.classList.remove('hidden');
   mountBhooShanketLogo('bootLogoMount', { width: 56, height: 56, showText: true, textVariant: 'full' });
 
   const messages = [
-    'ENVIRONMENTAL SENSORS ONLINE',
-    'AI RISK ENGINE ONLINE',
-    'GEOSPATIAL INTELLIGENCE ONLINE',
-    'EMERGENCY NETWORK READY',
-    'RESPONSE COORDINATION READY'
+    'ENVIRONMENTAL SAMPLE INPUTS READY',
+    'PROTOTYPE WEIGHTED MODEL READY',
+    'ILLUSTRATIVE MAP VIEW READY',
+    'SIMULATED WARNING FLOW READY',
+    'LOCAL RESPONSE DEMO READY'
   ];
 
   systems.forEach((item, index) => setTimeout(() => {
@@ -3064,9 +3181,28 @@ function bootSequence() {
   setTimeout(finishBoot, 1850);
 }
 
+function initializeStoryReveals() {
+  const targets = [...document.querySelectorAll('[data-story-reveal]')];
+  if (!targets.length) return;
+  if (!('IntersectionObserver' in window) || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    targets.forEach(target => target.classList.add('is-visible'));
+    return;
+  }
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+  targets.forEach(target => observer.observe(target));
+}
+
 function startLiveDemo() {
   if (appState.liveDemoRunning) return;
-  if (appState.demoStepIndex >= phaseDefinitions.length) appState.resetDemo?.();
+  const resuming = appState.demoPaused;
+  const resumeDelay = appState.demoPausedRemaining ?? 7600;
+  if (!resuming && appState.demoStepIndex >= phaseDefinitions.length) appState.resetDemo?.();
   stopMapMonitor();
   appState.mapMode = 'demo';
   document.querySelectorAll('[data-map-mode]').forEach(button => {
@@ -3077,14 +3213,18 @@ function startLiveDemo() {
   const mapModeStatus = document.getElementById('mapModeStatus');
   if (mapModeStatus) mapModeStatus.textContent = 'Live demo · simulated camera sequence';
   appState.liveDemoRunning = true;
+  appState.demoPaused = false;
+  appState.demoPausedRemaining = null;
   appState.reroutingActive = false;
   appState.reroutingStage = 0;
   appState.activeCorridor = 'safest';
   document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
 
   const demoButton = document.getElementById('startDemoBtn');
-  if (demoButton) demoButton.textContent = '● LIVE DEMO RUNNING';
+  if (demoButton) { demoButton.textContent = '● LIVE DEMO RUNNING'; demoButton.setAttribute('aria-label', 'Live simulated disaster sequence in progress'); }
   demoButton?.classList.add('live');
+  if (!resuming) appState.demoResponseStage = 0;
+  if (resuming) appState.resumeCriticalEvent?.();
 
   const cycle = phaseDefinitions;
   const transitionLocations = [2, 4, 5, 5];
@@ -3098,8 +3238,11 @@ function startLiveDemo() {
     if (i >= cycle.length) {
       appState.demoTimer = null;
       appState.liveDemoRunning = false;
+      appState.demoPaused = false;
+      appState.demoPausedRemaining = null;
+      appState.demoNextStepAt = null;
       appState.demoStepIndex = cycle.length;
-      if (demoButton) demoButton.textContent = '▶ REPLAY LIVE DEMO';
+      if (demoButton) { demoButton.textContent = '▶ REPLAY LIVE DEMO'; demoButton.setAttribute('aria-label', 'Replay the simulated disaster sequence'); }
       demoButton?.classList.remove('live');
       appState.phaseIndex = cycle.length - 1;
       renderAll();
@@ -3187,11 +3330,13 @@ function startLiveDemo() {
       appState.reroutingStage = 2; // 'AI ENGINE RECALCULATING...'
       renderRoute();
 
-      setTimeout(() => {
+      clearTimeout(appState.demoRouteTimer);
+      appState.demoRouteTimer = setTimeout(() => {
         appState.reroutingStage = 3; // 'SAFER ROUTE FOUND'
         appState.activeCorridor = 'alternative';
         renderRoute();
         showToast('Prototype route comparison updated', 'success');
+        appState.demoRouteTimer = null;
       }, 700);
 
       logCommand('CITIZEN', 'Critical warning synchronized', appState.citizenWarning, 'red');
@@ -3202,10 +3347,18 @@ function startLiveDemo() {
     if (appState.activeView === 'map' && appState.mapMode === 'demo') requestAnimationFrame(() => focusMapOnLocation(selected));
     i += 1;
     appState.demoStepIndex = i;
+    appState.demoNextStepAt = Date.now() + 7600;
     appState.demoTimer = window.setTimeout(advance, 7600);
   };
-  appState.demoTimer = window.setTimeout(advance, appState.demoSkipRequested ? 0 : 7600);
+  const skipToCritical = appState.demoSkipRequested;
   appState.demoSkipRequested = false;
+  if (skipToCritical) {
+    appState.demoNextStepAt = Date.now();
+    appState.demoTimer = window.setTimeout(advance, 0);
+  } else if (resuming) {
+    appState.demoNextStepAt = Date.now() + resumeDelay;
+    appState.demoTimer = window.setTimeout(advance, resumeDelay);
+  } else advance();
 }
 
 function skipLiveDemo() {
@@ -3234,6 +3387,7 @@ function init() {
   setupBhooShanketFavicon();
 
   initializeEvents();
+  initializeStoryReveals();
   bootSequence();
 
   if (hasAuthSession()) showApp();

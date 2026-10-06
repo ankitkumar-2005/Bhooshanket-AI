@@ -96,12 +96,15 @@ function pauseDemo() {
     showToast('No demo is currently running', 'info');
     return;
   }
+  appState.demoPausedRemaining = Math.max(0, (appState.demoNextStepAt || Date.now()) - Date.now());
   clearTimeout(appState.demoTimer);
   appState.demoTimer = null;
   appState.liveDemoRunning = false;
+  appState.demoPaused = true;
+  appState.pauseCriticalEvent?.();
   document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
   const start = document.getElementById('startDemoBtn');
-  if (start) { start.textContent = '▶ RESUME LIVE DEMO'; start.classList.remove('live'); }
+  if (start) { start.textContent = '▶ RESUME LIVE DEMO'; start.classList.remove('live'); start.setAttribute('aria-label', 'Resume the simulated disaster sequence'); }
   logCommand('DEMO', 'Live demo paused', 'The synchronized simulation timeline was paused by the operator.', 'yellow');
   renderAudit();
   showToast('Live demo paused. Resume continues from this point.', 'info');
@@ -109,10 +112,17 @@ function pauseDemo() {
 
 function resetDemo() {
   clearTimeout(appState.demoTimer);
+  clearTimeout(appState.demoRouteTimer);
+  appState.clearCriticalEvent?.();
   appState.demoTimer = null;
   appState.liveDemoRunning = false;
+  appState.demoPaused = false;
+  appState.demoPausedRemaining = null;
+  appState.demoNextStepAt = null;
+  appState.demoRouteTimer = null;
   document.dispatchEvent(new CustomEvent('bhooshanket:simulation-rendered'));
   appState.demoStepIndex = 0;
+  appState.demoResponseStage = 0;
   appState.demoSkipRequested = false;
   appState.demoRiskOverride = null;
   appState.phaseIndex = 0;
@@ -142,7 +152,7 @@ function resetDemo() {
   const mapModeStatus = document.getElementById('mapModeStatus');
   if (mapModeStatus) mapModeStatus.textContent = 'Manual exploration · simulated regional map';
   const start = document.getElementById('startDemoBtn');
-  if (start) { start.textContent = '▶ START LIVE DEMO'; start.classList.remove('live'); }
+  if (start) { start.textContent = '▶ START LIVE DEMO'; start.classList.remove('live'); start.setAttribute('aria-label', 'Start the simulated disaster sequence'); }
   logCommand('DEMO', 'Live demo reset', 'Simulation restored to the current monitored regional baseline.', 'blue');
   renderAll();
   renderAudit();
@@ -158,6 +168,10 @@ function addDemoControls() {
   const pause = createButton('Ⅱ PAUSE');
   const skip = createButton('SKIP →');
   const reset = createButton('↺ RESET');
+  pause.setAttribute('aria-label', 'Pause the simulated disaster sequence');
+  skip.setAttribute('aria-label', 'Skip to the critical response phase');
+  reset.setAttribute('aria-label', 'Reset the simulated disaster sequence');
+  start.setAttribute('aria-live', 'polite');
   pause.addEventListener('click', pauseDemo);
   skip.addEventListener('click', () => {
     if (!appState.liveDemoRunning) return showToast('Start the demo before skipping ahead.', 'info');
@@ -173,15 +187,20 @@ function renderPhaseTracker() {
   const tracker = document.getElementById('liveDemoTracker');
   if (!tracker) return;
   const phaseIndex = Math.max(0, Math.min(3, appState.phaseIndex || 0));
+  const phaseName = ['NORMAL', 'WARNING', 'HIGH RISK', 'CRITICAL'][phaseIndex];
   const phase = appState.liveDemoRunning
-    ? ['NORMAL', 'WARNING', 'HIGH RISK', 'CRITICAL'][phaseIndex]
-    : appState.demoStepIndex === 0 ? 'BASELINE' : appState.demoStepIndex >= 4 ? 'SCENARIO COMPLETE' : 'PAUSED';
+    ? phaseName
+    : appState.demoPaused ? `PAUSED · ${phaseName}`
+      : appState.demoStepIndex === 0 ? 'BASELINE' : appState.demoStepIndex >= 4 ? 'SCENARIO COMPLETE' : 'PAUSED';
+  const progress = appState.liveDemoRunning || appState.demoPaused
+    ? (phaseIndex + 1) * 25
+    : appState.demoStepIndex >= 4 ? 100 : 0;
   const location = locationCatalog.find(item => item.id === appState.selectedLocationId) || locationCatalog[1];
   const risk = appState.demoRiskOverride ?? location.risk;
   tracker.innerHTML = `
-    <div class="demo-phase-head"><span>DEMO SIMULATION</span><strong>${appState.liveDemoRunning ? `PHASE ${String(phaseIndex + 1).padStart(2, '0')} / 04` : 'CURRENT BASELINE'} · ${phase}</strong></div>
+    <div class="demo-phase-head"><span>DEMO SIMULATION</span><strong>${appState.liveDemoRunning || appState.demoPaused ? `PHASE ${String(phaseIndex + 1).padStart(2, '0')} / 04` : 'CURRENT BASELINE'} · ${phase}</strong></div>
     <div class="demo-phase-stats"><div><small>RISK</small><b>${risk}%</b></div><div><small>RAINFALL</small><b>${location.rainfall} mm/hr</b></div><div><small>SOIL MOISTURE</small><b>${location.soilMoisture}%</b></div><div><small>SLOPE MOVEMENT</small><b>${location.slopeMovement} mm</b></div></div>
-    <div class="demo-phase-progress" aria-label="${appState.liveDemoRunning ? `Live demo phase ${phaseIndex + 1} of 4` : 'Current baseline'}"><i style="width:${appState.liveDemoRunning ? (phaseIndex + 1) * 25 : 0}%"></i></div>`;
+    <div class="demo-phase-progress" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${progress / 25}" aria-label="${appState.liveDemoRunning || appState.demoPaused ? `Live demo phase ${phaseIndex + 1} of 4` : 'Current baseline'}"><i style="width:${progress}%"></i></div>`;
 }
 
 function addPhaseTracker() {
