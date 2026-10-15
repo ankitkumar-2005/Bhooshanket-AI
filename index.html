@@ -117,7 +117,7 @@
                 <button type="button" id="createAccount" class="text-link">Create an account</button>
                 <button type="button" id="forgotPasscode" class="text-link">Forgot Passcode</button>
               </div>
-              <p class="auth-note">Prototype authentication only. Accounts are stored only in this browser and are not shared with other devices.</p>
+              <p class="auth-note">Prototype authentication only. Create an account for this browser, or use the authority credentials configured in the deployment.</p>
             </form>
             <section class="signup-panel hidden" id="signupPanel" aria-live="polite">
               <div class="recovery-head">
@@ -140,7 +140,7 @@
                 <div><strong>Passcode Recovery</strong><small>PROTOTYPE SESSION RECOVERY</small></div>
                 <button type="button" class="text-link" id="closeRecovery">Close</button>
               </div>
-              <p>Confirm the configured authority email to set a new passcode for this browser session.</p>
+              <p>Recover an existing browser-only account here. Authority credentials configured in the deployment need a secure backend email service for recovery.</p>
               <label>
                 <span>Authority Email</span>
                 <input id="recoveryEmail" type="email" autocomplete="email" placeholder="Enter your authority email" />
@@ -158,7 +158,7 @@
                 <button type="button" class="primary-btn" id="completeRecovery">SET SESSION PASSCODE</button>
               </div>
               <p class="recovery-message" id="recoveryMessage"></p>
-              <p class="auth-note">No email is sent and no real account is changed. Production passcode recovery requires a secure backend and email provider.</p>
+              <p class="auth-note">No email is sent. This changes only an existing browser-only prototype account on this device.</p>
             </section>
           </div>
         </div>
@@ -683,6 +683,11 @@
                   <div class="eyebrow">ALERT CENTER</div>
                   <h3>Emergency Alert Intelligence Center</h3>
                 </div>
+              </div>
+              <div class="operational-toolbar" aria-label="Alert controls">
+                <label class="toolbar-search"><span class="sr-only">Search alerts</span><input id="alertSearch" type="search" placeholder="Search alert ID or location" /></label>
+                <label><span>Severity</span><select id="alertSeverityFilter"><option value="all">All severities</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select></label>
+                <label><span>Status</span><select id="alertStatusFilter"><option value="all">All statuses</option><option value="Active">Active</option><option value="Escalated">Escalated</option><option value="Acknowledged">Acknowledged</option><option value="Under Review">Under review</option></select></label>
               </div>
               <div class="alert-list" id="alertList"></div>
             </div>

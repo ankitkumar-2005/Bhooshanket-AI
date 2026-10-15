@@ -3,12 +3,7 @@ import { mountBhooShanketLogo, setupBhooShanketFavicon } from './logo.js';
 const AUTH_KEY = 'bhooshanket_session';
 const THEME_KEY = 'bhooshanket_theme';
 const ASSISTANT_STATE_KEY = 'bhooshanket_assistant_state';
-const RECOVERY_PASSCODE_KEY = 'bhooshanket_recovery_passcode';
 const LOCAL_ACCOUNTS_KEY = 'bhooshanket_local_accounts';
-const OFFLINE_DEMO_AUTH = {
-  email: 'demo@bhooshanket.ai',
-  passcode: 'BhooShanketDemo2026!'
-};
 const VIEWS = ['dashboard', 'map', 'prediction', 'analytics', 'weather', 'sensors', 'alerts', 'communication', 'authority', 'rescue', 'citizen', 'route', 'zones', 'precautions', 'contacts', 'energy', 'audit', 'settings'];
 const ENERGY_MODES = ['ACTIVE MONITORING', 'ENERGY SAVING', 'NIGHT MONITORING', 'AUTOMATIC ALERT PRIORITY'];
 const INCIDENT_FLOW = ['NEW', 'ACKNOWLEDGED', 'TEAM ASSIGNED', 'DISPATCHED', 'ON SCENE', 'RESOLVED'];
@@ -47,6 +42,8 @@ const appState = {
   historyMetrics: ['rainfall'],
   precautionTab: null,
   mapRiskFilter: 'all',
+  alertFilter: 'all',
+  alertSearch: '',
   chartInstances: [],
   displayedRisk: 0,
   citizenStatus: '',
@@ -230,13 +227,9 @@ function getSelectedLocation() {
 
 function getAuthConfig() {
   const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
-  const email = String(env.VITE_BHOOSHANKET_LOGIN_EMAIL || '').trim().toLowerCase();
-  const passcode = String(env.VITE_BHOOSHANKET_LOGIN_PASSCODE || '');
   return {
-    // The fallback keeps the downloaded/static prototype usable when it is
-    // opened directly from disk instead of through Vite.
-    email: email || OFFLINE_DEMO_AUTH.email,
-    passcode: sessionStorage.getItem(RECOVERY_PASSCODE_KEY) || passcode || OFFLINE_DEMO_AUTH.passcode
+    email: String(env.VITE_BHOOSHANKET_LOGIN_EMAIL || '').trim().toLowerCase(),
+    passcode: String(env.VITE_BHOOSHANKET_LOGIN_PASSCODE || '')
   };
 }
 
@@ -964,7 +957,7 @@ function renderSensors() {
   `;
 
   document.getElementById('sensorGrid').innerHTML = filtered.map(sensor => `
-    <div class="sensor-card">
+    <button type="button" class="sensor-card" data-sensor-detail="${sensor.id}" aria-label="View details for ${sensor.name}, ${sensor.id}">
       <div class="sensor-head">
         <h5>${sensor.name}</h5>
         <span class="status-chip ${sensor.status}">${sensor.status.toUpperCase()}</span>
@@ -984,12 +977,23 @@ function renderSensors() {
         <span>Battery: ${sensor.battery}</span>
         <span>Last Updated: ${sensor.lastUpdated}</span>
       </div>
-    </div>
+    </button>
   `).join('');
 }
 
 function renderAlerts() {
-  document.getElementById('alertList').innerHTML = alertBank.map(alert => {
+  const severity = document.getElementById('alertSeverityFilter')?.value || appState.alertFilter;
+  const status = document.getElementById('alertStatusFilter')?.value || 'all';
+  const search = (document.getElementById('alertSearch')?.value || appState.alertSearch).trim().toLowerCase();
+  const weight = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+  const visibleAlerts = alertBank
+    .filter(alert => (severity === 'all' || alert.riskLevel === severity)
+      && (status === 'all' || alert.status === status)
+      && (!search || `${alert.id} ${alert.location} ${alert.district}`.toLowerCase().includes(search)))
+    .sort((a, b) => (weight[b.riskLevel] || 0) - (weight[a.riskLevel] || 0));
+
+  const list = document.getElementById('alertList');
+  list.innerHTML = visibleAlerts.length ? visibleAlerts.map(alert => {
     const critical = alert.riskLevel === 'CRITICAL';
     return `
       <div class="alert-item ${critical ? 'critical' : ''}">
@@ -1026,7 +1030,7 @@ function renderAlerts() {
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') : `<div class="empty-state"><strong>No alerts match these filters.</strong><p>Adjust severity, status, or the location search to restore the active operational list.</p></div>`;
 }
 
 function renderIncidentTable() {
@@ -2690,7 +2694,7 @@ function initializeEvents() {
     signupPanel?.classList.add('hidden');
     recoveryPanel?.classList.remove('hidden');
     recoveryReset?.classList.add('hidden');
-    setRecoveryMessage('Verify your configured authority email to continue.');
+    setRecoveryMessage('Enter the email for a local account in this browser, or the configured authority email.');
     document.getElementById('recoveryEmail')?.focus();
     recoveryPanel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
@@ -2699,13 +2703,17 @@ function initializeEvents() {
   document.getElementById('verifyRecoveryEmail')?.addEventListener('click', () => {
     const config = getAuthConfig();
     const requestedEmail = document.getElementById('recoveryEmail').value.trim().toLowerCase();
-    if (requestedEmail !== config.email && !hasLocalAccount(requestedEmail)) {
-      setRecoveryMessage('The authority email could not be verified.', 'error');
+    if (hasLocalAccount(requestedEmail)) {
+      recoveryReset?.classList.remove('hidden');
+      setRecoveryMessage('Browser account found. Choose a new password for this browser only.', 'success');
+      document.getElementById('recoveryNewPasscode')?.focus();
       return;
     }
-    recoveryReset?.classList.remove('hidden');
-    setRecoveryMessage('Email verified. Choose a new passcode for this browser session.', 'success');
-    document.getElementById('recoveryNewPasscode')?.focus();
+    if (config.email && requestedEmail === config.email) {
+      setRecoveryMessage('This authority account is controlled by deployment settings. A secure reset needs a backend email service; contact the deployment owner.', 'error');
+      return;
+    }
+    setRecoveryMessage('No browser account matches this email. Create an account on this device first.', 'error');
   });
 
   document.getElementById('completeRecovery')?.addEventListener('click', () => {
@@ -2720,20 +2728,20 @@ function initializeEvents() {
       return;
     }
     const recoveryEmail = document.getElementById('recoveryEmail').value.trim().toLowerCase();
-    if (hasLocalAccount(recoveryEmail)) {
-      const accounts = getLocalAccounts();
-      const existing = getLocalAccount(recoveryEmail);
-      accounts[recoveryEmail] = { name: existing?.name || recoveryEmail.split('@')[0], email: recoveryEmail, passcode: newPasscode };
-      if (!saveLocalAccounts(accounts)) {
-        setRecoveryMessage('Something went wrong. Please try again.', 'error');
-        return;
-      }
-    } else {
-      sessionStorage.setItem(RECOVERY_PASSCODE_KEY, newPasscode);
+    if (!hasLocalAccount(recoveryEmail)) {
+      setRecoveryMessage('Recovery is available only for an existing browser account.', 'error');
+      return;
+    }
+    const accounts = getLocalAccounts();
+    const existing = getLocalAccount(recoveryEmail);
+    accounts[recoveryEmail] = { name: existing?.name || recoveryEmail.split('@')[0], email: recoveryEmail, passcode: newPasscode };
+    if (!saveLocalAccounts(accounts)) {
+      setRecoveryMessage('Something went wrong. Please try again.', 'error');
+      return;
     }
     document.getElementById('passwordInput').value = '';
     document.getElementById('loginEmail').value = recoveryEmail;
-    setRecoveryMessage('Session passcode updated. Use it to sign in now.', 'success');
+    setRecoveryMessage('Browser account password updated. Use it to sign in now.', 'success');
     recoveryReset?.classList.add('hidden');
     showToast('Prototype session passcode updated', 'success');
   });
@@ -2940,14 +2948,20 @@ function initializeEvents() {
     });
   });
 
+  const respondAssistant = question => {
+    const ansBox = document.getElementById('assistantAnswers');
+    if (!ansBox || !question) return;
+    ansBox.setAttribute('aria-busy', 'true');
+    ansBox.innerHTML = '<span class="assistant-typing" role="status">Preparing a response from the active prototype dataset<span></span><span></span><span></span></span>';
+    const delay = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 220;
+    window.setTimeout(() => {
+      ansBox.innerHTML = answerAssistantQuery(question);
+      ansBox.setAttribute('aria-busy', 'false');
+    }, delay);
+  };
+
   document.querySelectorAll('.assistant-actions button').forEach(button => {
-    button.addEventListener('click', () => {
-      const question = button.dataset.question;
-      const ansBox = document.getElementById('assistantAnswers');
-      if (ansBox && question) {
-        ansBox.innerHTML = answerAssistantQuery(question);
-      }
-    });
+    button.addEventListener('click', () => respondAssistant(button.dataset.question));
   });
 
   const assistantQuery = document.getElementById('assistantQuery');
@@ -2955,10 +2969,7 @@ function initializeEvents() {
     if (!assistantQuery) return;
     const q = assistantQuery.value.trim();
     if (!q) return;
-    const ansBox = document.getElementById('assistantAnswers');
-    if (ansBox) {
-      ansBox.innerHTML = answerAssistantQuery(q);
-    }
+    respondAssistant(q);
     assistantQuery.value = '';
   };
   document.getElementById('assistantSend')?.addEventListener('click', submitAssistantQuery);
@@ -2982,6 +2993,27 @@ function initializeEvents() {
   document.getElementById('assistantClose')?.addEventListener('click', () => setAssistantState('closed'));
 
   document.addEventListener('click', event => {
+    const sensorDetail = event.target.closest('[data-sensor-detail]');
+    if (sensorDetail) {
+      const sensor = sensorCatalog.find(item => item.id === sensorDetail.dataset.sensorDetail);
+      if (sensor) {
+        appState.selectedSensorId = sensor.id;
+        openDrawer(`
+          <div class="eyebrow">SIMULATED SENSOR RECORD</div>
+          <h3>${escapeHtml(sensor.name)}</h3>
+          <p class="auth-note">${escapeHtml(sensor.id)} · ${escapeHtml(sensor.location)}</p>
+          <div class="drawer-stat-grid">
+            <div><span>Current reading</span><strong>${escapeHtml(sensor.reading)}${escapeHtml(sensor.unit)}</strong></div>
+            <div><span>Status</span><strong>${escapeHtml(sensor.status).toUpperCase()}</strong></div>
+            <div><span>Signal</span><strong>${escapeHtml(sensor.strength)}</strong></div>
+            <div><span>Battery</span><strong>${escapeHtml(sensor.battery)}</strong></div>
+          </div>
+          <p>Last sample update: ${escapeHtml(sensor.lastUpdated)}. This record uses prototype data and does not represent a field-connected sensor.</p>
+          <button type="button" class="primary-btn" data-goto="map">VIEW ON MAP</button>`);
+      }
+      return;
+    }
+
     const mapZone = event.target.closest('[data-open-map-zone]');
     if (mapZone) {
       const locationId = Number(mapZone.dataset.openMapZone);
@@ -3060,6 +3092,15 @@ function initializeEvents() {
   });
 
   document.getElementById('sendSimAlert')?.addEventListener('click', dispatchSimulationAlert);
+  document.getElementById('alertSearch')?.addEventListener('input', event => {
+    appState.alertSearch = event.target.value;
+    renderAlerts();
+  });
+  document.getElementById('alertSeverityFilter')?.addEventListener('change', event => {
+    appState.alertFilter = event.target.value;
+    renderAlerts();
+  });
+  document.getElementById('alertStatusFilter')?.addEventListener('change', renderAlerts);
   document.getElementById('findRouteBtn')?.addEventListener('click', findSafestRoute);
   document.getElementById('settingsLight')?.addEventListener('click', () => { applyTheme('light'); renderAll(); });
   document.getElementById('settingsDark')?.addEventListener('click', () => { applyTheme('dark'); renderAll(); });
